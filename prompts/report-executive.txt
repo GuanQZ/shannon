@@ -39,6 +39,11 @@ You will analyze the following deliverable files:
 <deliverable_instructions>
 MODIFY the existing file `deliverables/comprehensive_security_assessment_report.md` by:
 
+LANGUAGE REQUIREMENT:
+- The final report content MUST be in Simplified Chinese (zh-CN).
+- Keep technical identifiers unchanged (e.g., CVE IDs, payloads, endpoint paths, HTTP methods).
+- If source content is English, translate the narrative and analysis into Chinese.
+
 1. ADDING these sections at the top:
 
 # Security Assessment Report
