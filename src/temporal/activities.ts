@@ -68,6 +68,7 @@ import {
   getGitCommitHash,
 } from '../utils/git-manager.js';
 import { assembleFinalReport, injectModelIntoReport } from '../phases/reporting.js';
+import { translateReports } from '../phases/translation.js';
 import { getPromptNameForAgent } from '../types/agents.js';
 import { AuditSession } from '../audit/index.js';
 import type { WorkflowSummary } from '../audit/workflow-logger.js';
@@ -89,6 +90,13 @@ export interface ActivityInput {
   outputPath?: string;
   pipelineTestingMode?: boolean;
   workflowId: string;
+}
+
+export interface TranslationActivityInput {
+  repoPath: string;
+  apiKey: string;
+  baseUrl?: string;
+  model?: string;
 }
 
 /**
@@ -389,6 +397,42 @@ export async function injectReportMetadataActivity(input: ActivityInput): Promis
   } catch (error) {
     const err = error as Error;
     console.log(chalk.yellow(`⚠️ Error injecting model into report: ${err.message}`));
+    // Don't throw - this is a non-critical enhancement
+  }
+}
+
+/**
+ * Translate all reports to Chinese after Reporting phase.
+ * 报告阶段完成后翻译所有报告为中文。
+ *
+ * This is a non-critical enhancement - failures don't block workflow completion.
+ * 这是增强功能，失败不会阻塞工作流完成。
+ */
+export async function translateReportsActivity(
+  input: TranslationActivityInput
+): Promise<void> {
+  const { repoPath, apiKey, baseUrl, model } = input;
+
+  console.log(chalk.blue('🔄 Starting report translation to Chinese...'));
+
+  try {
+    const result = await translateReports(repoPath, {
+      apiKey,
+      baseUrl,
+      model,
+    });
+
+    if (result.success) {
+      console.log(chalk.green(`✅ All ${result.translatedFiles.length} reports translated successfully`));
+    } else {
+      console.log(chalk.yellow(`⚠️ Translation completed with ${result.failedFiles.length} failures`));
+      for (const failure of result.failedFiles) {
+        console.log(chalk.yellow(`  - ${failure.path}: ${failure.error}`));
+      }
+    }
+  } catch (error) {
+    const err = error as Error;
+    console.log(chalk.yellow(`⚠️ Translation activity error: ${err.message}`));
     // Don't throw - this is a non-critical enhancement
   }
 }

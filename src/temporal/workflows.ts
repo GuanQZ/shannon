@@ -40,6 +40,7 @@ import {
   type AgentMetrics,
 } from './shared.js';
 import type { VulnType } from '../queue-validation.js';
+import chalk from 'chalk';
 
 // Retry configuration for production (long intervals for billing recovery)
 const PRODUCTION_RETRY = {
@@ -279,6 +280,21 @@ export async function pentestPipelineWorkflow(
 
     // Inject model metadata into the final report
     await a.injectReportMetadataActivity(activityInput);
+
+    // Translate all reports to Chinese
+    // 翻译所有报告为中文
+    try {
+      await a.translateReportsActivity({
+        repoPath: activityInput.repoPath,
+        apiKey: process.env.ANTHROPIC_API_KEY || '',
+        baseUrl: process.env.ANTHROPIC_BASE_URL,
+        model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929',
+      });
+    } catch (error) {
+      // Non-critical - don't fail the workflow
+      const err = error as Error;
+      console.log(chalk.yellow(`⚠️ Translation failed: ${err.message}`));
+    }
 
     await a.logPhaseTransition(activityInput, 'reporting', 'complete');
 

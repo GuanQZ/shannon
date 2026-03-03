@@ -14,6 +14,7 @@
 import { fs, path } from 'zx';
 import chalk from 'chalk';
 import { Anthropic } from '@anthropic-ai/sdk';
+import { PentestError } from '../error-handling.js';
 
 /**
  * Translation configuration
@@ -117,9 +118,12 @@ ${text}`;
     ],
   });
 
-  return message.content[0].type === 'text'
-    ? message.content[0].text
-    : text;
+  if (message.content[0].type !== 'text') {
+    console.log(chalk.yellow('⚠️ Non-text response received from API, returning original text'));
+    return text;
+  }
+
+  return message.content[0].text;
 }
 
 /**
@@ -130,6 +134,10 @@ export async function translateReports(
   repoPath: string,
   config: TranslationConfig
 ): Promise<TranslateResult> {
+  if (!config.apiKey) {
+    throw new PentestError('API key is required for translation', 'configuration', false);
+  }
+
   const deliverablesDir = path.join(repoPath, 'deliverables');
   const chineseDir = path.join(deliverablesDir, 'chinese');
 
