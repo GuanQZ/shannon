@@ -91,9 +91,9 @@ async function convertMarkdownToPdf(
   outputPath: string
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    markdownpdf()
+    (markdownpdf() as any)
       .from(markdownPath)
-      .to(outputPath, (err) => {
+      .to(outputPath, (err: Error | null) => {
         if (err) {
           reject(err);
         } else {
