@@ -262,8 +262,6 @@ export async function translateReports(
     console.log(chalk.blue('📄 Generating PDF from Chinese reports...'));
 
     // Chinese reports are in deliverables/chinese/
-    const chineseDir = path.join(deliverablesDir, 'chinese');
-
     if (await fs.pathExists(chineseDir)) {
       // Recursively find all .md files in chinese directory
       const findMdFiles = async (dir: string): Promise<string[]> => {
