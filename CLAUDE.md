@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+## Tool Preferences
+
+- **搜索互联网**: 必须使用 `mcp__minimax__web_search` 工具，不要使用 `WebSearch`（后者需要 Anthropic API，在此环境中不可用）
+
 AI-powered penetration testing agent for defensive security analysis. Automates vulnerability assessment by combining reconnaissance tools with AI-powered code analysis.
 
 ## Commands
@@ -131,3 +135,12 @@ Defensive security tool only. Use only on systems you own or have explicit permi
 - **Local apps unreachable** — Use `host.docker.internal` instead of `localhost`
 - **Missing tools** — Use `PIPELINE_TESTING=true` to skip nmap/subfinder/whatweb (graceful degradation)
 - **Container permissions** — On Linux, may need `sudo` for docker commands
+- **Build fails** — Try: `rm -rf node_modules && npm install`, ensure Node.js 20+ (`export PATH="/usr/local/opt/node@20/bin:$PATH"`)
+
+## Implementation Workflow
+
+### Superpowers 核心规则（强制）
+- **在任何响应或行动之前，必须检查是否有适用的 skill**
+- 即使有 1% 的可能性适用，也必须调用 Skill tool
+- 不能找借口跳过："这太简单"、"我先探索一下"、"我需要更多上下文"
+- Skill 有优先级：先 process skills (brainstorming, debugging)，后 implementation skills
