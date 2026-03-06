@@ -13,7 +13,7 @@
 
 import { fs, path } from 'zx';
 import chalk from 'chalk';
-import { Anthropic } from '@anthropic-ai/sdk';
+import markdownpdf from 'markdown-pdf';
 import { PentestError } from '../error-handling.js';
 
 /**
@@ -60,14 +60,11 @@ export interface TranslateResult {
 }
 
 /**
- * Create Anthropic client
- * 创建 Anthropic 客户端
+ * Get API base URL
+ * 获取 API 基础 URL
  */
-function createAnthropicClient(config: TranslationConfig): Anthropic {
-  return new Anthropic({
-    apiKey: config.apiKey,
-    baseURL: config.baseUrl,
-  });
+function getBaseUrl(config: TranslationConfig): string {
+  return config.baseUrl || 'https://api.minimaxi.com/anthropic';
 }
 
 /**
@@ -86,14 +83,39 @@ function getStageFolder(filename: string): string {
 }
 
 /**
+ * Convert markdown to PDF
+ * 将 Markdown 转换为 PDF
+ */
+async function convertMarkdownToPdf(
+  markdownPath: string,
+  outputPath: string
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    markdownpdf()
+      .from(markdownPath)
+      .to(outputPath, (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+  });
+}
+
+/**
  * Translate text to Chinese using Claude API
  * 使用 Claude API 将文本翻译为中文
  */
 async function translateText(
-  client: Anthropic,
+  config: TranslationConfig,
   text: string,
-  model: string = 'claude-sonnet-4-5-20250929'
+  model: string = 'minimax-m2.5'
 ): Promise<string> {
+  // Use the model from config, fallback to minimax-m2.5
+  const modelToUse = model || 'minimax-m2.5';
+  const baseUrl = getBaseUrl(config);
+
   const translationPrompt = `You are a professional technical translator. Translate the following English penetration testing report to Simplified Chinese.
 
 IMPORTANT RULES:
@@ -107,23 +129,51 @@ Translate now:
 
 ${text}`;
 
-  const message = await client.messages.create({
-    model,
-    max_tokens: 8192,
-    messages: [
-      {
-        role: 'user',
-        content: translationPrompt,
-      },
-    ],
+  // Use shorter max_tokens and simpler prompt like audit logger
+  const response = await fetch(`${baseUrl}/v1/messages`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': config.apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: modelToUse,
+      max_tokens: 32768,
+      system: 'You are a translator. Translate the text to Simplified Chinese ONLY. Output ONLY the translation, no original text, no explanations. Keep technical terms (CVEs, payloads, endpoints, HTTP methods, file paths, code) in English. Do not include any prefix like [agent] or labels.',
+      messages: [{ role: 'user', content: text }]
+    })
   });
 
-  if (message.content[0].type !== 'text') {
-    console.log(chalk.yellow('⚠️ Non-text response received from API, returning original text'));
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Translation API error: ${response.status} ${errorText}`);
+  }
+
+  const result = await response.json() as { content: Array<{ type: string; text: string; thinking?: string }> | undefined };
+
+  if (!result.content || result.content.length === 0) {
+    console.log(chalk.yellow('⚠️ Empty response from API, returning original text'));
     return text;
   }
 
-  return message.content[0].text;
+  // MiniMax returns 'thinking' type first, then 'text' type
+  // Find the text content (skip thinking type)
+  const textContent = result.content.find(c => c.type === 'text');
+  const thinkingContent = result.content.find(c => c.type === 'thinking');
+
+  if (textContent?.text) {
+    return textContent.text;
+  }
+
+  // If no text content, try to extract from thinking
+  if (thinkingContent?.thinking) {
+    console.log(chalk.gray('🔍 Extracted translation from thinking'));
+    return thinkingContent.thinking;
+  }
+
+  console.log(chalk.yellow('⚠️ No valid translation found, returning original text'));
+  return text;
 }
 
 /**
@@ -135,7 +185,7 @@ export async function translateReports(
   config: TranslationConfig
 ): Promise<TranslateResult> {
   if (!config.apiKey) {
-    throw new PentestError('API key is required for translation', 'configuration', false);
+    throw new PentestError('API key is required for translation', 'config', false);
   }
 
   const deliverablesDir = path.join(repoPath, 'deliverables');
@@ -153,12 +203,9 @@ export async function translateReports(
     return { success: true, translatedFiles: [], failedFiles: [] };
   }
 
-  // Create Anthropic client
-  const client = createAnthropicClient(config);
-
   // Read all .md files in deliverables directory
   const files = await fs.readdir(deliverablesDir);
-  const mdFiles = files.filter((f) => f.endsWith('.md'));
+  const mdFiles = files.filter((f: string) => f.endsWith('.md'));
 
   console.log(chalk.blue(`📝 Found ${mdFiles.length} Markdown files to translate`));
 
@@ -178,7 +225,7 @@ export async function translateReports(
         const content = await fs.readFile(sourcePath, 'utf8');
 
         // Translate content
-        const translated = await translateText(client, content, config.model);
+        const translated = await translateText(config, content, config.model);
 
         // Ensure target directory exists
         await fs.ensureDir(targetDir);
@@ -208,6 +255,56 @@ export async function translateReports(
   const successCount = translatedFiles.length;
   const failCount = failedFiles.length;
   console.log(chalk.blue(`📊 Translation complete: ${successCount} success, ${failCount} failed`));
+
+  // Generate PDF from translated Chinese reports
+  // 从翻译的中文报告生成 PDF
+  if (translatedFiles.length > 0) {
+    console.log(chalk.blue('📄 Generating PDF from Chinese reports...'));
+
+    // Chinese reports are in deliverables/chinese/
+    const chineseDir = path.join(deliverablesDir, 'chinese');
+
+    if (await fs.pathExists(chineseDir)) {
+      // Recursively find all .md files in chinese directory
+      const findMdFiles = async (dir: string): Promise<string[]> => {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        const mdFiles: string[] = [];
+
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            const subFiles = await findMdFiles(fullPath);
+            mdFiles.push(...subFiles);
+          } else if (entry.name.endsWith('.md')) {
+            mdFiles.push(fullPath);
+          }
+        }
+
+        return mdFiles;
+      };
+
+      const mdFiles = await findMdFiles(chineseDir);
+      let pdfSuccess = 0;
+      let pdfFailed = 0;
+
+      for (const mdPath of mdFiles) {
+        const pdfPath = mdPath.replace('.md', '.pdf');
+
+        try {
+          await convertMarkdownToPdf(mdPath, pdfPath);
+          console.log(chalk.green(`✅ PDF generated: ${path.basename(pdfPath)}`));
+          pdfSuccess++;
+        } catch (error) {
+          console.log(chalk.red(`❌ Failed to generate PDF: ${path.basename(mdPath)}: ${error}`));
+          pdfFailed++;
+        }
+      }
+
+      console.log(chalk.green(`✅ PDF generation complete: ${pdfSuccess} success, ${pdfFailed} failed`));
+    } else {
+      console.log(chalk.yellow('⚠️ No Chinese directory found, skipping PDF generation'));
+    }
+  }
 
   return {
     success: failCount === 0,
