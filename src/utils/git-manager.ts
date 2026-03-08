@@ -14,7 +14,7 @@ import { $ } from 'zx';
 import chalk from 'chalk';
 
 function isGitWritesDisabled(): boolean {
-  const value = process.env.SHANNON_DISABLE_GIT_WRITES?.toLowerCase().trim();
+  const value = process.env.LUMIN_DISABLE_GIT_WRITES?.toLowerCase().trim();
   return value === '1' || value === 'true' || value === 'yes';
 }
 
@@ -179,7 +179,7 @@ export async function rollbackGitWorkspace(
   reason: string = 'retry preparation'
 ): Promise<GitOperationResult> {
   if (isGitWritesDisabled()) {
-    console.log(chalk.gray('    ⏭️  已启用 SHANNON_DISABLE_GIT_WRITES，跳过 git 回滚'));
+    console.log(chalk.gray('    ⏭️  已启用 LUMIN_DISABLE_GIT_WRITES，跳过 git 回滚'));
     return { success: true };
   }
 
@@ -228,7 +228,7 @@ export async function createGitCheckpoint(
   attempt: number
 ): Promise<GitOperationResult> {
   if (isGitWritesDisabled()) {
-    console.log(chalk.gray('    ⏭️  已启用 SHANNON_DISABLE_GIT_WRITES，跳过 git checkpoint'));
+    console.log(chalk.gray('    ⏭️  已启用 LUMIN_DISABLE_GIT_WRITES，跳过 git checkpoint'));
     return { success: true };
   }
 
@@ -280,7 +280,7 @@ export async function commitGitSuccess(
   description: string
 ): Promise<GitOperationResult> {
   if (isGitWritesDisabled()) {
-    console.log(chalk.gray('    ⏭️  已启用 SHANNON_DISABLE_GIT_WRITES，跳过 git success commit'));
+    console.log(chalk.gray('    ⏭️  已启用 LUMIN_DISABLE_GIT_WRITES，跳过 git success commit'));
     return { success: true };
   }
 

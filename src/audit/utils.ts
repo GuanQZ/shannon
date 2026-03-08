@@ -27,10 +27,10 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Get Shannon repository root
-// Get Shannon repository root。
-export const SHANNON_ROOT = path.resolve(__dirname, '..', '..');
-export const AUDIT_LOGS_DIR = path.join(SHANNON_ROOT, 'audit-logs');
+// Get Lumin repository root
+// Get Lumin repository root。
+export const LUMIN_ROOT = path.resolve(__dirname, '..', '..');
+export const AUDIT_LOGS_DIR = path.join(LUMIN_ROOT, 'audit-logs');
 
 export interface SessionMetadata {
   id: string;

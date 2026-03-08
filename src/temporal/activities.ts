@@ -11,8 +11,8 @@
  */
 
 /**
- * Temporal activities for Shannon agent execution.
- * Shannon 代理执行的 `Temporal` `activity` 集合。
+ * Temporal activities for Lumin agent execution.
+ * Lumin 代理执行的 `Temporal` `activity` 集合。
  *
  * Each activity wraps a single agent execution with:
  * 每个 `activity` 在执行单个代理时都会包含：
@@ -274,6 +274,7 @@ async function runAgentActivity(
           attemptNumber,
           duration_ms: result.duration,
           cost_usd: 0,
+          total_tokens: result.totalTokens || 0,
           success: false,
           model: result.model,
           error: `Spending cap likely reached: ${resultText.slice(0, 100)}`,
@@ -292,6 +293,7 @@ async function runAgentActivity(
         attemptNumber,
         duration_ms: result.duration,
         cost_usd: result.cost || 0,
+        total_tokens: result.totalTokens || 0,
         success: false,
         model: result.model,
         error: result.error || 'Execution failed',
@@ -308,6 +310,7 @@ async function runAgentActivity(
         attemptNumber,
         duration_ms: result.duration,
         cost_usd: result.cost || 0,
+        total_tokens: result.totalTokens || 0,
         success: false,
         model: result.model,
         error: 'Output validation failed',
@@ -334,6 +337,7 @@ async function runAgentActivity(
       attemptNumber,
       duration_ms: result.duration,
       cost_usd: result.cost || 0,
+      total_tokens: result.totalTokens || 0,
       success: true,
       model: result.model,
       ...(commitHash && { checkpoint: commitHash }),

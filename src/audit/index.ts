@@ -16,8 +16,8 @@
  *
  * Public API for the audit system. Provides crash-safe, append-only logging
  * Public API for the 审计 系统. Provides crash-安全, append-仅 日志记录。
- * and comprehensive metrics tracking for Shannon penetration testing sessions.
- * and comprehensive metrics tracking for Shannon penetration testing sessions.。
+ * and comprehensive metrics tracking for Lumin penetration testing sessions.
+ * and comprehensive metrics tracking for Lumin penetration testing sessions.。
  *
  * IMPORTANT: Session objects must have an 'id' field (NOT 'sessionId')
  * IMPORTANT: Session objects must have an 'id' field (NOT 'sessionId')。

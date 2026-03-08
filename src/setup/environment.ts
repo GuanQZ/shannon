@@ -53,8 +53,8 @@ export async function setupLocalRepo(repoPath: string): Promise<string> {
       // 该步骤非致命，失败时继续执行后续流程。
     }
 
-    // MCP tools (save_deliverable, generate_totp) are now available natively via shannon-helper MCP server
-    // `save_deliverable` 与 `generate_totp` 已由 `shannon-helper` MCP 服务原生提供。
+    // MCP tools (save_deliverable, generate_totp) are now available natively via lumin-helper MCP server
+    // `save_deliverable` 与 `generate_totp` 已由 `lumin-helper` MCP 服务原生提供。
     // No need to copy bash scripts to target repository
     // 不再需要把 Bash 脚本复制到目标仓库。
 

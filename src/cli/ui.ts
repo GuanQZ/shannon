@@ -21,7 +21,7 @@ export function showHelp(): void {
   console.log(chalk.gray('自动化安全评估工具\n'));
 
   console.log(chalk.yellow.bold('用法：'));
-  console.log('  shannon <WEB_URL> <REPO_PATH> [--config config.yaml] [--output /path/to/reports]\n');
+  console.log('  lumin <WEB_URL> <REPO_PATH> [--config config.yaml] [--output /path/to/reports]\n');
 
   console.log(chalk.yellow.bold('参数：'));
   console.log('  --config <file>      认证与测试参数的 YAML 配置文件');
@@ -31,10 +31,10 @@ export function showHelp(): void {
   console.log('  --help               显示帮助信息\n');
 
   console.log(chalk.yellow.bold('示例：'));
-  console.log('  shannon "https://example.com" "/path/to/local/repo"');
-  console.log('  shannon "https://example.com" "/path/to/local/repo" --config auth.yaml');
-  console.log('  shannon "https://example.com" "/path/to/local/repo" --output /path/to/reports');
-  console.log('  shannon "https://example.com" "/path/to/local/repo" --pipeline-testing\n');
+  console.log('  lumin "https://example.com" "/path/to/local/repo"');
+  console.log('  lumin "https://example.com" "/path/to/local/repo" --config auth.yaml');
+  console.log('  lumin "https://example.com" "/path/to/local/repo" --output /path/to/reports');
+  console.log('  lumin "https://example.com" "/path/to/local/repo" --pipeline-testing\n');
 
   console.log(chalk.yellow.bold('要求：'));
   console.log('  • WEB_URL 必须以 http:// 或 https:// 开头');

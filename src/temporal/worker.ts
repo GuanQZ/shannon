@@ -12,11 +12,11 @@
  */
 
 /**
- * Temporal worker for Shannon pentest pipeline.
- * `Temporal` `worker`，用于执行 Shannon 渗透测试流水线。
+ * Temporal worker for Lumin pentest pipeline.
+ * `Temporal` `worker`，用于执行 Lumin 渗透测试流水线。
  *
- * Polls the 'shannon-pipeline' task queue and executes activities.
- * 持续轮询 `shannon-pipeline` 任务队列并执行活动。
+ * Polls the 'lumin-pipeline' task queue and executes activities.
+ * 持续轮询 `lumin-pipeline` 任务队列并执行活动。
  * Handles up to 25 concurrent activities to support multiple parallel workflows.
  * 最多并发处理二十五个活动，用于支撑多条并行工作流。
  *
@@ -69,7 +69,7 @@ async function runWorker(): Promise<void> {
     namespace: 'default',
     workflowBundle,
     activities,
-    taskQueue: 'shannon-pipeline',
+    taskQueue: 'lumin-pipeline',
     maxConcurrentActivityTaskExecutions: 25, // Support multiple parallel workflows (5 agents × ~5 workflows)
   });
 
@@ -83,8 +83,8 @@ async function runWorker(): Promise<void> {
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 
-  console.log(chalk.green('Shannon worker 已启动'));
-  console.log(chalk.gray('任务队列：shannon-pipeline'));
+  console.log(chalk.green('Lumin worker 已启动'));
+  console.log(chalk.gray('任务队列：lumin-pipeline'));
   console.log(chalk.gray('按 Ctrl+C 停止\n'));
 
   try {

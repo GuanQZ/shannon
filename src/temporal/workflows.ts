@@ -11,8 +11,8 @@
  */
 
 /**
- * Temporal workflow for Shannon pentest pipeline.
- * Shannon 渗透测试流水线的 `Temporal` 主工作流。
+ * Temporal workflow for Lumin pentest pipeline.
+ * Lumin 渗透测试流水线的 `Temporal` 主工作流。
  *
  * Orchestrates the penetration testing workflow:
  * 负责按既定顺序组织渗透测试流程：

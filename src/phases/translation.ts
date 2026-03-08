@@ -447,27 +447,36 @@ export async function translateReports(
       // Puppeteer can't resolve ../../../ paths correctly, so we copy images to same directory
       const copyImagesForPdf = async (mdPath: string): Promise<void> => {
         const mdDir = path.dirname(mdPath);
-        const content = await fs.readFile(mdPath, 'utf8');
+        let content = await fs.readFile(mdPath, 'utf8');
 
-        // Find all image references with ../ paths
+        // Find all image references with relative paths (../ or ../../ etc.)
         const imageRegex = /!\[([^\]]*)\]\(([^)]+\.png)\)/g;
         let match;
         const imagesCopied = new Set<string>();
 
         while ((match = imageRegex.exec(content)) !== null) {
           const imagePath = match[2];
-          if (imagePath && imagePath.startsWith('../') && !imagesCopied.has(imagePath)) {
+          // Match any path containing ../ (single or multi-level relative paths)
+          if (imagePath && imagePath.includes('../') && !imagesCopied.has(imagePath)) {
             imagesCopied.add(imagePath);
             const absImagePath = path.resolve(mdDir, imagePath);
             const imageFileName = path.basename(absImagePath);
             const targetPath = path.join(mdDir, imageFileName);
 
+            // Copy image to markdown directory
             if (await fs.pathExists(absImagePath) && !(await fs.pathExists(targetPath))) {
               await fs.copyFile(absImagePath, targetPath);
               console.log(chalk.gray(`  📷 Copied image for PDF: ${imageFileName}`));
             }
+
+            // Replace relative path with just filename in markdown content
+            // This ensures Puppeteer can find the image in the same directory
+            content = content.replace(imagePath, imageFileName);
           }
         }
+
+        // Write updated markdown with local image paths
+        await fs.writeFile(mdPath, content, 'utf8');
       };
 
       for (const mdPath of mdFiles) {

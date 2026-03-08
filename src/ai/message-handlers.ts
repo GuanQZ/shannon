@@ -138,7 +138,7 @@ export function detectApiError(content: string): ApiErrorDetection {
 }
 
 // Maps SDK structured error types to our error handling.
-// 将 `SDK` 的枚举错误映射到 Shannon 的统一错误模型，
+// 将 `SDK` 的枚举错误映射到 Lumin 的统一错误模型，
 // 统一控制可重试策略，便于 `Temporal` 编排层处理。
 function handleStructuredError(
   errorType: SDKAssistantMessageError,

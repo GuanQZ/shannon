@@ -12,8 +12,8 @@
  */
 
 /**
- * Temporal query tool for inspecting Shannon workflow progress.
- * `Temporal` 查询工具，用于查看 Shannon 工作流进度。
+ * Temporal query tool for inspecting Lumin workflow progress.
+ * `Temporal` 查询工具，用于查看 Lumin 工作流进度。
  *
  * Queries a running or completed workflow and displays its state.
  * 查询运行中或已完成的工作流，并展示其当前状态。
@@ -73,12 +73,12 @@ interface PipelineProgress {
 }
 
 function showUsage(): void {
-  console.log(chalk.cyan.bold('\nShannon Temporal Query Tool'));
+  console.log(chalk.cyan.bold('\nLumin Temporal Query Tool'));
   console.log(chalk.gray('查询运行中工作流的执行进度\n'));
   console.log(chalk.yellow('用法：'));
   console.log('  node dist/temporal/query.js <workflowId>\n');
   console.log(chalk.yellow('示例：'));
-  console.log('  node dist/temporal/query.js shannon-1704672000000\n');
+  console.log('  node dist/temporal/query.js lumin-1704672000000\n');
 }
 
 function getStatusColor(status: string): string {

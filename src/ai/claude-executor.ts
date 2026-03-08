@@ -36,7 +36,7 @@ import { formatTimestamp } from '../utils/formatting.js';
 import { createGitCheckpoint, commitGitSuccess, rollbackGitWorkspace, getGitCommitHash } from '../utils/git-manager.js';
 import { AGENT_VALIDATORS, MCP_AGENT_MAPPING } from '../constants.js';
 import { AuditSession } from '../audit/index.js';
-import { createShannonHelperServer } from '../../mcp-server/dist/index.js';
+import { createLuminHelperServer } from '../../mcp-server/dist/index.js';
 import type { SessionMetadata } from '../audit/utils.js';
 import { getPromptNameForAgent } from '../types/agents.js';
 import type { AgentName } from '../types/index.js';
@@ -48,7 +48,7 @@ import { createAuditLogger } from './audit-logger.js';
 import { getActualModelName } from './router-utils.js';
 
 declare global {
-  var SHANNON_DISABLE_LOADER: boolean | undefined;
+  var LUMIN_DISABLE_LOADER: boolean | undefined;
 }
 
 export interface ClaudePromptResult {
@@ -57,6 +57,7 @@ export interface ClaudePromptResult {
   duration: number;
   turns?: number | undefined;
   cost: number;
+  totalTokens?: number | undefined;
   model?: string | undefined;
   partialCost?: number | undefined;
   apiErrorDetected?: boolean | undefined;
@@ -73,7 +74,7 @@ interface StdioMcpServer {
   env: Record<string, string>;
 }
 
-type McpServer = ReturnType<typeof createShannonHelperServer> | StdioMcpServer;
+type McpServer = ReturnType<typeof createLuminHelperServer> | StdioMcpServer;
 
 // Configures MCP servers for agent execution, with Docker-specific Chromium handling
 // 根据 `agent` 类型动态装配 `MCP` 工具；在容器环境切换浏览器启动参数。
@@ -81,10 +82,10 @@ function buildMcpServers(
   sourceDir: string,
   agentName: string | null
 ): Record<string, McpServer> {
-  const shannonHelperServer = createShannonHelperServer(sourceDir);
+  const luminHelperServer = createLuminHelperServer(sourceDir);
 
   const mcpServers: Record<string, McpServer> = {
-    'shannon-helper': shannonHelperServer,
+    'lumin-helper': luminHelperServer,
   };
 
   if (agentName) {
@@ -98,7 +99,7 @@ function buildMcpServers(
 
       // Docker uses system Chromium; local dev uses Playwright's bundled browsers
       // 容器环境中优先使用系统浏览器，避免运行时下载浏览器依赖失败。
-      const isDocker = process.env.SHANNON_DOCKER === 'true';
+      const isDocker = process.env.LUMIN_DOCKER === 'true';
 
       const mcpArgs: string[] = [
         '@playwright/mcp@latest',
@@ -244,7 +245,7 @@ export async function runClaudePrompt(
   const execContext = detectExecutionContext(description);
   const progress = createProgressManager(
     { description, useCleanOutput: execContext.useCleanOutput },
-    global.SHANNON_DISABLE_LOADER ?? false
+    global.LUMIN_DISABLE_LOADER ?? false
   );
   const auditLogger = createAuditLogger(auditSession);
 
@@ -419,7 +420,7 @@ async function processMessageStream(
     // Heartbeat logging when loader is disabled
     // 在长任务期间定时反馈“仍在运行”。
     const now = Date.now();
-    if (global.SHANNON_DISABLE_LOADER && now - lastHeartbeat > HEARTBEAT_INTERVAL) {
+    if (global.LUMIN_DISABLE_LOADER && now - lastHeartbeat > HEARTBEAT_INTERVAL) {
       console.log(chalk.blue(`    [${Math.floor((now - timer.startTime) / 1000)}s] ${description} running... (Turn ${turnCount})`));
       lastHeartbeat = now;
     }
@@ -515,12 +516,14 @@ export async function runClaudePromptWithRetry(
               attemptNumber: number;
               duration_ms: number;
               cost_usd: number;
+              total_tokens: number;
               success: true;
               checkpoint?: string;
             } = {
               attemptNumber: attempt,
               duration_ms: result.duration,
               cost_usd: result.cost || 0,
+              total_tokens: result.totalTokens || 0,
               success: true,
             };
             if (commitHash) {
@@ -542,6 +545,7 @@ export async function runClaudePromptWithRetry(
               attemptNumber: attempt,
               duration_ms: result.duration,
               cost_usd: result.partialCost || result.cost || 0,
+              total_tokens: result.totalTokens || 0,
               success: false,
               error: 'Output validation failed',
               isFinalAttempt: attempt === maxRetries
@@ -578,6 +582,7 @@ export async function runClaudePromptWithRetry(
           attemptNumber: attempt,
           duration_ms: err.duration || 0,
           cost_usd: err.cost || 0,
+          total_tokens: 0,
           success: false,
           error: err.message,
           isFinalAttempt: attempt === maxRetries

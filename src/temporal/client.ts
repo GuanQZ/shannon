@@ -12,8 +12,8 @@
  */
 
 /**
- * Temporal client for starting Shannon pentest pipeline workflows.
- * `Temporal` 客户端，用于启动 Shannon 渗透测试流水线工作流。
+ * Temporal client for starting Lumin pentest pipeline workflows.
+ * `Temporal` 客户端，用于启动 Lumin 渗透测试流水线工作流。
  *
  * Starts a workflow and optionally waits for completion with progress polling.
  * 启动工作流，并可按需轮询等待任务完成。
@@ -35,7 +35,7 @@
  * `--output <path>` 指定审计输出目录。
  *   --pipeline-testing    Use minimal prompts for fast testing
  * `--pipeline-testing` 启用快速测试模式。
- *   --workflow-id <id>    Custom workflow ID (default: shannon-<timestamp>)
+ *   --workflow-id <id>    Custom workflow ID (default: lumin-<timestamp>)
  * `--workflow-id <id>` 指定自定义工作流标识。
  *   --wait                Wait for workflow completion with progress polling
  * `--wait` 轮询等待任务完成。
@@ -67,7 +67,7 @@ dotenv.config();
 const PROGRESS_QUERY = 'getProgress';
 
 function showUsage(): void {
-  console.log(chalk.cyan.bold('\nShannon Temporal Client'));
+  console.log(chalk.cyan.bold('\nLumin Temporal Client'));
   console.log(chalk.gray('启动渗透测试流水线工作流\n'));
   console.log(chalk.yellow('用法：'));
   console.log(
@@ -77,7 +77,7 @@ function showUsage(): void {
   console.log('  --config <path>       配置文件路径');
   console.log('  --output <path>       审计日志输出目录');
   console.log('  --pipeline-testing    启用最小提示词快速测试模式');
-  console.log('  --workflow-id <id>    自定义工作流 ID（默认：shannon-<timestamp>）');
+  console.log('  --workflow-id <id>    自定义工作流 ID（默认：lumin-<timestamp>）');
   console.log('  --wait                轮询等待工作流完成\n');
   console.log(chalk.yellow('示例：'));
   console.log('  node dist/temporal/client.js https://example.com /path/to/repo');
@@ -162,7 +162,7 @@ async function startPipeline(): Promise<void> {
 
   try {
     const hostname = sanitizeHostname(webUrl);
-    const workflowId = customWorkflowId || `${hostname}_shannon-${Date.now()}`;
+    const workflowId = customWorkflowId || `${hostname}_lumin-${Date.now()}`;
 
     const input: PipelineInput = {
       webUrl,
@@ -202,7 +202,7 @@ async function startPipeline(): Promise<void> {
     const handle = await client.workflow.start<(input: PipelineInput) => Promise<PipelineState>>(
       'pentestPipelineWorkflow',
       {
-        taskQueue: 'shannon-pipeline',
+        taskQueue: 'lumin-pipeline',
         workflowId,
         args: [input],
       }
@@ -211,8 +211,8 @@ async function startPipeline(): Promise<void> {
     if (!waitForCompletion) {
       console.log(chalk.bold('进度查看：'));
       console.log(chalk.white('  Web UI:  ') + chalk.blue(`http://localhost:8233/namespaces/default/workflows/${workflowId}`));
-      console.log(chalk.white('  Logs:    ') + chalk.gray(`./shannon logs ID=${workflowId}`));
-      console.log(chalk.white('  Query:   ') + chalk.gray(`./shannon query ID=${workflowId}`));
+      console.log(chalk.white('  Logs:    ') + chalk.gray(`./lumin logs ID=${workflowId}`));
+      console.log(chalk.white('  Query:   ') + chalk.gray(`./lumin query ID=${workflowId}`));
       console.log();
       console.log(chalk.bold('输出位置：'));
       console.log(chalk.white('  报告目录： ') + chalk.cyan(outputDir));

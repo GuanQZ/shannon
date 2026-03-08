@@ -100,7 +100,7 @@ export class WorkflowLogger {
   private async writeHeader(): Promise<void> {
     const header = [
       `================================================================================`,
-      `Shannon Pentest - Workflow Log`,
+      `Lumin Pentest - Workflow Log`,
       `================================================================================`,
       `Workflow ID: ${this.sessionMetadata.id}`,
       `Target URL:  ${this.sessionMetadata.webUrl}`,

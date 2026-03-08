@@ -35,6 +35,7 @@ interface AgentEndResult {
   attemptNumber: number;
   duration_ms: number;
   cost_usd: number;
+  total_tokens: number;
   success: boolean;
   model?: string | undefined;
   error?: string | undefined;
