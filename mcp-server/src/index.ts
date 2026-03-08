@@ -11,13 +11,13 @@
  */
 
 /**
- * Shannon Helper MCP Server
- * Shannon 辅助 MCP 服务。
+ * Lumin Helper MCP Server
+ * Lumin 辅助 MCP 服务。
  *
  * In-process MCP server providing save_deliverable and generate_totp tools
  * 进程内 MCP 服务，提供 save_deliverable 与 generate_totp 两个工具。
- * for Shannon penetration testing agents.
- * 面向 Shannon 渗透测试代理使用。
+ * for Lumin penetration testing agents.
+ * 面向 Lumin 渗透测试代理使用。
  *
  * Replaces bash script invocations with native tool access.
  * 用原生工具访问替代 bash 脚本调用。
@@ -33,8 +33,8 @@ import { createSaveDeliverableTool } from './tools/save-deliverable.js';
 import { generateTotpTool } from './tools/generate-totp.js';
 
 /**
- * Create Shannon Helper MCP Server with target directory context
- * 创建带目标目录上下文的 Shannon 辅助 MCP 服务。
+ * Create Lumin Helper MCP Server with target directory context
+ * 创建带目标目录上下文的 Lumin 辅助 MCP 服务。
  *
  * Each workflow should create its own MCP server instance with its targetDir.
  * 每个工作流都应创建自己的 MCP 服务实例并绑定独立 targetDir。
@@ -43,13 +43,13 @@ import { generateTotpTool } from './tools/generate-totp.js';
  * conditions when multiple workflows run in parallel.
  * 这样可避免并行工作流之间互相写错目录。
  */
-export function createShannonHelperServer(targetDir: string): ReturnType<typeof createSdkMcpServer> {
+export function createLuminHelperServer(targetDir: string): ReturnType<typeof createSdkMcpServer> {
   // Create save_deliverable tool with targetDir in closure (no global variable)
   // 创建带 targetDir 闭包的 save_deliverable 工具，不依赖全局变量。
   const saveDeliverableTool = createSaveDeliverableTool(targetDir);
 
   return createSdkMcpServer({
-    name: 'shannon-helper',
+    name: 'lumin-helper',
     version: '1.0.0',
     tools: [saveDeliverableTool, generateTotpTool],
   });
@@ -59,6 +59,9 @@ export function createShannonHelperServer(targetDir: string): ReturnType<typeof 
 // Export factory for direct usage 如果 needed。
 export { createSaveDeliverableTool } from './tools/save-deliverable.js';
 export { generateTotpTool } from './tools/generate-totp.js';
+
+// Backward compatibility alias
+export const createShannonHelperServer = createLuminHelperServer;
 
 // Export types for external use
 // Export 类型 for external 使用。
