@@ -19,17 +19,17 @@ git clone https://github.com/org/repo.git ./repos/my-repo
 # or symlink: ln -s /path/to/existing/repo ./repos/my-repo
 
 # Run
-./shannon start URL=<url> REPO=my-repo
-./shannon start URL=<url> REPO=my-repo CONFIG=./configs/my-config.yaml
+./lumin start URL=<url> REPO=my-repo
+./lumin start URL=<url> REPO=my-repo CONFIG=./configs/my-config.yaml
 
 # Monitor
-./shannon logs                      # Real-time worker logs
-./shannon query ID=<workflow-id>    # Query workflow progress
+./lumin logs                      # Real-time worker logs
+./lumin query ID=<workflow-id>    # Query workflow progress
 # Temporal Web UI: http://localhost:8233
 
 # Stop
-./shannon stop                      # Preserves workflow data
-./shannon stop CLEAN=true           # Full cleanup including volumes
+./lumin stop                      # Preserves workflow data
+./lumin stop CLEAN=true           # Full cleanup including volumes
 
 # Build
 npm run build
@@ -124,14 +124,14 @@ Defensive security tool only. Use only on systems you own or have explicit permi
 
 **Core Logic:** `src/session-manager.ts`, `src/ai/claude-executor.ts`, `src/config-parser.ts`, `src/audit/`
 
-**Config:** `shannon` (CLI), `docker-compose.yml`, `configs/`, `prompts/`
+**Config:** `lumin` (CLI), `docker-compose.yml`, `configs/`, `prompts/`
 
 ## Troubleshooting
 
 - **"Repository not found"** — `REPO` must be a folder name inside `./repos/`, not an absolute path. Clone or symlink your repo there first: `ln -s /path/to/repo ./repos/my-repo`
 - **"Temporal not ready"** — Wait for health check or `docker compose logs temporal`
 - **Worker not processing** — Check `docker compose ps`
-- **Reset state** — `./shannon stop CLEAN=true`
+- **Reset state** — `./lumin stop CLEAN=true`
 - **Local apps unreachable** — Use `host.docker.internal` instead of `localhost`
 - **Missing tools** — Use `PIPELINE_TESTING=true` to skip nmap/subfinder/whatweb (graceful degradation)
 - **Container permissions** — On Linux, may need `sudo` for docker commands
