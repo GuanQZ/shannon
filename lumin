@@ -1,5 +1,5 @@
 #!/bin/bash
-# Shannon CLI - AI Penetration Testing Framework
+# Lumin CLI - AI Penetration Testing Framework
 
 set -e
 
@@ -25,21 +25,21 @@ fi
 show_help() {
   cat << 'EOF'
 
-  ███████╗██╗  ██╗ █████╗ ███╗   ██╗███╗   ██╗ ██████╗ ███╗   ██╗
-  ██╔════╝██║  ██║██╔══██╗████╗  ██║████╗  ██║██╔═══██╗████╗  ██║
-  ███████╗███████║███████║██╔██╗ ██║██╔██╗ ██║██║   ██║██╔██╗ ██║
-  ╚════██║██╔══██║██╔══██║██║╚██╗██║██║╚██╗██║██║   ██║██║╚██╗██║
-  ███████║██║  ██║██║  ██║██║ ╚████║██║ ╚████║╚██████╔╝██║ ╚████║
-  ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝  ╚═══╝
+  ███╗   ███╗ ██████╗ ███╗   ██╗███████╗██╗   ██╗███╗   ███╗███████╗███╗   ██╗
+  ████╗ ████║██╔═══██╗████╗  ██║██╔════╝██║   ██║████╗ ████║██╔════╝████╗  ██║
+  ██╔████╔██║██║   ██║██╔██╗ ██║█████╗  ██║   ██║██╔████╔██║█████╗  ██╔██╗ ██║
+  ██║╚██╔╝██║██║   ██║██║╚██╗██║██╔══╝  ██║   ██║██║╚██╔╝██║██╔══╝  ██║╚██╗██║
+  ██║ ╚═╝ ██║╚██████╔╝██║ ╚████║███████╗╚██████╔╝██║ ╚═╝ ██║███████╗██║ ╚████║
+  ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚═╝     ╚═╝╚══════╝╚═╝  ╚═══╝
 
            AI Penetration Testing Framework
 
 Usage:
-  ./shannon start URL=<url> REPO=<name>   Start a pentest workflow
-  ./shannon logs ID=<workflow-id>         Tail logs for a specific workflow
-  ./shannon query ID=<workflow-id>        Query workflow progress
-  ./shannon stop                          Stop all containers
-  ./shannon help                          Show this help message
+  ./lumin start URL=<url> REPO=<name>   Start a pentest workflow
+  ./lumin logs ID=<workflow-id>         Tail logs for a specific workflow
+  ./lumin query ID=<workflow-id>        Query workflow progress
+  ./lumin stop                          Stop all containers
+  ./lumin help                          Show this help message
 
 Options for 'start':
   REPO=<name>            Folder name under ./repos/ (e.g. REPO=repo-name)
@@ -47,7 +47,7 @@ Options for 'start':
   CONFIG=<path>          Configuration file (YAML)
   OUTPUT=<path>          Output directory for reports (default: ./audit-logs/)
   SAFE_MODE=true|false   Default true. Enables safe defaults for external scans
-  SHANNON_DISABLE_GIT_WRITES=true|false  Disable local git checkpoint/rollback/commit
+  LUMIN_DISABLE_GIT_WRITES=true|false  Disable local git checkpoint/rollback/commit
   PIPELINE_TESTING=true  Use minimal prompts for fast testing
   ROUTER=true            Route requests through claude-code-router (multi-model support)
 
@@ -55,12 +55,12 @@ Options for 'stop':
   CLEAN=true             Remove all data including volumes
 
 Examples:
-  ./shannon start URL=https://example.com REPO=repo-name
-  ./shannon start URL=https://example.com REPO=repo-name CONFIG=./config.yaml
-  ./shannon start URL=https://example.com REPO=repo-name OUTPUT=./my-reports
-  ./shannon logs ID=example.com_shannon-1234567890
-  ./shannon query ID=shannon-1234567890
-  ./shannon stop CLEAN=true
+  ./lumin start URL=https://example.com REPO=repo-name
+  ./lumin start URL=https://example.com REPO=repo-name CONFIG=./config.yaml
+  ./lumin start URL=https://example.com REPO=repo-name OUTPUT=./my-reports
+  ./lumin logs ID=example.com_lumin-1234567890
+  ./lumin query ID=lumin-1234567890
+  ./lumin stop CLEAN=true
 
 Monitor workflows at http://localhost:8233
 EOF
@@ -78,7 +78,7 @@ parse_args() {
       CLEAN=*) CLEAN="${arg#CLEAN=}" ;;
       PIPELINE_TESTING=*) PIPELINE_TESTING="${arg#PIPELINE_TESTING=}" ;;
       SAFE_MODE=*) SAFE_MODE="${arg#SAFE_MODE=}" ;;
-      SHANNON_DISABLE_GIT_WRITES=*) SHANNON_DISABLE_GIT_WRITES="${arg#SHANNON_DISABLE_GIT_WRITES=}" ;;
+      LUMIN_DISABLE_GIT_WRITES=*) LUMIN_DISABLE_GIT_WRITES="${arg#LUMIN_DISABLE_GIT_WRITES=}" ;;
       REBUILD=*) REBUILD="${arg#REBUILD=}" ;;
       ROUTER=*) ROUTER="${arg#ROUTER=}" ;;
     esac
@@ -113,7 +113,7 @@ ensure_containers() {
   fi
 
   # Need to start containers
-  echo "Starting Shannon containers..."
+  echo "Starting Lumin containers..."
   if [ "$REBUILD" = "true" ]; then
     # Force rebuild without cache (use when code changes aren't being picked up)
     echo "Rebuilding with --no-cache..."
@@ -141,15 +141,15 @@ cmd_start() {
 
   # Safe mode defaults for scanning external repositories
   SAFE_MODE="${SAFE_MODE:-true}"
-  if [ "$SAFE_MODE" = "true" ] && [ -z "$SHANNON_DISABLE_GIT_WRITES" ]; then
-    SHANNON_DISABLE_GIT_WRITES="true"
+  if [ "$SAFE_MODE" = "true" ] && [ -z "$LUMIN_DISABLE_GIT_WRITES" ]; then
+    LUMIN_DISABLE_GIT_WRITES="true"
   fi
-  export SHANNON_DISABLE_GIT_WRITES
+  export LUMIN_DISABLE_GIT_WRITES
 
   # Validate required vars
   if [ -z "$URL" ] || [ -z "$REPO" ]; then
     echo "ERROR: URL and REPO are required"
-    echo "Usage: ./shannon start URL=<url> REPO=<name>"
+    echo "Usage: ./lumin start URL=<url> REPO=<name>"
     exit 1
   fi
 
@@ -208,7 +208,7 @@ cmd_start() {
     fi
   fi
 
-  if [ "$SHANNON_DISABLE_GIT_WRITES" = "true" ]; then
+  if [ "$LUMIN_DISABLE_GIT_WRITES" = "true" ]; then
     echo "Safe mode: local git checkpoint/rollback/commit is disabled"
   fi
 
@@ -245,7 +245,7 @@ cmd_start() {
     # Set ANTHROPIC_BASE_URL to route through router
     export ANTHROPIC_BASE_URL="http://router:3456"
     # Set auth token to match router's APIKEY
-    export ANTHROPIC_AUTH_TOKEN="shannon-router-key"
+    export ANTHROPIC_AUTH_TOKEN="lumin-router-key"
   fi
 
   # Ensure audit-logs directory exists with write permissions for container user (UID 1001)
@@ -283,7 +283,7 @@ cmd_logs() {
 
   if [ -z "$ID" ]; then
     echo "ERROR: ID is required"
-    echo "Usage: ./shannon logs ID=<workflow-id>"
+    echo "Usage: ./lumin logs ID=<workflow-id>"
     exit 1
   fi
 
@@ -313,7 +313,7 @@ cmd_logs() {
     echo "  - Workflow hasn't started yet"
     echo "  - Workflow ID is incorrect"
     echo ""
-    echo "Check: ./shannon query ID=$ID for workflow details"
+    echo "Check: ./lumin query ID=$ID for workflow details"
     exit 1
   fi
 }
@@ -323,7 +323,7 @@ cmd_query() {
 
   if [ -z "$ID" ]; then
     echo "ERROR: ID is required"
-    echo "Usage: ./shannon query ID=<workflow-id>"
+    echo "Usage: ./lumin query ID=<workflow-id>"
     exit 1
   fi
 
