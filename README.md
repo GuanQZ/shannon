@@ -1,18 +1,18 @@
 > [!NOTE]
-> **[Shannon Lite achieves a 96.15% success rate on a hint-free, source-aware XBOW benchmark. &rarr;](https://github.com/KeygraphHQ/shannon/tree/main/xben-benchmark-results/README.md)**
+> **[Lumin Lite achieves a 96.15% success rate on a hint-free, source-aware XBOW benchmark. &rarr;](https://github.com/KeygraphHQ/lumin/tree/main/xben-benchmark-results/README.md)**
 
 
 <div align="center">
 
-<a href="https://trendshift.io/repositories/15604" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15604" alt="KeygraphHQ%2Fshannon | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+<a href="https://trendshift.io/repositories/15604" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15604" alt="KeygraphHQ%2Flumin | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
-<img src="./assets/shannon-screen.png?v=2" alt="Shannon Screen" width="100%">
+<img src="./assets/lumin-screen.png?v=2" alt="Lumin Screen" width="100%">
 
-# Shannon is your fully autonomous AI pentester.
+# Lumin is your fully autonomous AI pentester.
 
-Shannon’s job is simple: break your web app before anyone else does. <br />
+Lumin’s job is simple: break your web app before anyone else does. <br />
 The Red Team to your vibe-coding Blue team. <br />
-Every Claude (coder) deserves their Shannon.
+Every Claude (coder) deserves their Lumin.
 
 ---
 
@@ -21,32 +21,32 @@ Every Claude (coder) deserves their Shannon.
 ---
 </div>
 
-## 🎯 What is Shannon?
+## 🎯 What is Lumin?
 
-Shannon is an AI pentester that delivers actual exploits, not just alerts.
+Lumin is an AI pentester that delivers actual exploits, not just alerts.
 
-Shannon's goal is to break your web app before someone else does. It autonomously hunts for attack vectors in your code, then uses its built-in browser to execute real exploits, such as injection attacks, and auth bypass, to prove the vulnerability is actually exploitable.
+Lumin's goal is to break your web app before someone else does. It autonomously hunts for attack vectors in your code, then uses its built-in browser to execute real exploits, such as injection attacks, and auth bypass, to prove the vulnerability is actually exploitable.
 
-**What Problem Does Shannon Solve?**
+**What Problem Does Lumin Solve?**
 
 Thanks to tools like Claude Code and Cursor, your team ships code non-stop. But your penetration test? That happens once a year. This creates a *massive* security gap. For the other 364 days, you could be unknowingly shipping vulnerabilities to production.
 
-Shannon closes this gap by acting as your on-demand whitebox pentester. It doesn't just find potential issues. It executes real exploits, providing concrete proof of vulnerabilities. This lets you ship with confidence, knowing every build can be secured.
+Lumin closes this gap by acting as your on-demand whitebox pentester. It doesn't just find potential issues. It executes real exploits, providing concrete proof of vulnerabilities. This lets you ship with confidence, knowing every build can be secured.
 
 > [!NOTE]
 > **From Autonomous Pentesting to Automated Compliance**
 >
-> Shannon is a core component of the **Keygraph Security and Compliance Platform**.
+> Lumin is a core component of the **Keygraph Security and Compliance Platform**.
 >
-> While Shannon automates the critical task of penetration testing for your application, our broader platform automates your entire compliance journey—from evidence collection to audit readiness. We're building the "Rippling for Cybersecurity," a single platform to manage your security posture and streamline compliance frameworks like SOC 2 and HIPAA.
+> While Lumin automates the critical task of penetration testing for your application, our broader platform automates your entire compliance journey—from evidence collection to audit readiness. We're building the "Rippling for Cybersecurity," a single platform to manage your security posture and streamline compliance frameworks like SOC 2 and HIPAA.
 >
 > ➡️ **[Learn more about the Keygraph Platform](https://keygraph.io)**
 
-## 🎬 See Shannon in Action
+## 🎬 See Lumin in Action
 
-**Real Results**: Shannon discovered 20+ critical vulnerabilities in OWASP Juice Shop, including complete auth bypass and database exfiltration. [See full report →](sample-reports/shannon-report-juice-shop.md)
+**Real Results**: Lumin discovered 20+ critical vulnerabilities in OWASP Juice Shop, including complete auth bypass and database exfiltration. [See full report →](sample-reports/lumin-report-juice-shop.md)
 
-![Demo](assets/shannon-action.gif)
+![Demo](assets/lumin-action.gif)
 
 ## ✨ Features
 
@@ -59,31 +59,31 @@ Shannon closes this gap by acting as your on-demand whitebox pentester. It doesn
 
 ## 📦 Product Line
 
-Shannon is available in two editions:
+Lumin is available in two editions:
 
 | Edition | License | Best For |
 |---------|---------|----------|
-| **Shannon Lite** | AGPL-3.0 | Security teams, independent researchers, testing your own applications |
-| **Shannon Pro** | Commercial | Enterprises requiring advanced features, CI/CD integration, and dedicated support |
+| **Lumin Lite** | AGPL-3.0 | Security teams, independent researchers, testing your own applications |
+| **Lumin Pro** | Commercial | Enterprises requiring advanced features, CI/CD integration, and dedicated support |
 
-> **This repository contains Shannon Lite,** which utilizes our core autonomous AI pentesting framework. **Shannon Pro** enhances this foundation with an advanced, LLM-powered data flow analysis engine (inspired by the [LLMDFA paper](https://arxiv.org/abs/2402.10754)) for enterprise-grade code analysis and deeper vulnerability detection.
+> **This repository contains Lumin Lite,** which utilizes our core autonomous AI pentesting framework. **Lumin Pro** enhances this foundation with an advanced, LLM-powered data flow analysis engine (inspired by the [LLMDFA paper](https://arxiv.org/abs/2402.10754)) for enterprise-grade code analysis and deeper vulnerability detection.
 
 > [!IMPORTANT]
-> **White-box only.** Shannon Lite is designed for **white-box (source-available)** application security testing.  
+> **White-box only.** Lumin Lite is designed for **white-box (source-available)** application security testing.  
 > It expects access to your application's source code and repository layout.
 
 [See feature comparison](./SHANNON-PRO.md)
 ## 📑 Table of Contents
 
-- [What is Shannon?](#-what-is-shannon)
-- [See Shannon in Action](#-see-shannon-in-action)
+- [What is Lumin?](#-what-is-lumin)
+- [See Lumin in Action](#-see-lumin-in-action)
 - [Features](#-features)
 - [Product Line](#-product-line)
 - [Setup & Usage Instructions](#-setup--usage-instructions)
   - [Prerequisites](#prerequisites)
   - [Quick Start](#quick-start)
   - [Monitoring Progress](#monitoring-progress)
-  - [Stopping Shannon](#stopping-shannon)
+  - [Stopping Lumin](#stopping-lumin)
   - [Usage Examples](#usage-examples)
   - [Configuration (Optional)](#configuration-optional)
   - [[EXPERIMENTAL - UNSUPPORTED] Router Mode (Alternative Providers)](#experimental---unsupported-router-mode-alternative-providers)
@@ -111,9 +111,9 @@ Shannon is available in two editions:
 ### Quick Start
 
 ```bash
-# 1. Clone Shannon
-git clone https://github.com/KeygraphHQ/shannon.git
-cd shannon
+# 1. Clone Lumin
+git clone https://github.com/KeygraphHQ/lumin.git
+cd lumin
 
 # 2. Configure credentials (choose one method)
 
@@ -126,70 +126,70 @@ ANTHROPIC_API_KEY=your-api-key
 EOF
 
 # 3. Run a pentest
-./shannon start URL=https://your-app.com REPO=your-repo
+./lumin start URL=https://your-app.com REPO=your-repo
 ```
 
-Shannon will build the containers, start the workflow, and return a workflow ID. The pentest runs in the background.
+Lumin will build the containers, start the workflow, and return a workflow ID. The pentest runs in the background.
 
 ### Monitoring Progress
 
 ```bash
 # View real-time worker logs
-./shannon logs
+./lumin logs
 
 # Query a specific workflow's progress
-./shannon query ID=shannon-1234567890
+./lumin query ID=lumin-1234567890
 
 # Open the Temporal Web UI for detailed monitoring
 open http://localhost:8233
 ```
 
-### Stopping Shannon
+### Stopping Lumin
 
 ```bash
 # Stop all containers (preserves workflow data)
-./shannon stop
+./lumin stop
 
 # Full cleanup (removes all data)
-./shannon stop CLEAN=true
+./lumin stop CLEAN=true
 ```
 
 ### Usage Examples
 
 ```bash
 # Basic pentest
-./shannon start URL=https://example.com REPO=repo-name
+./lumin start URL=https://example.com REPO=repo-name
 
 # Scan directly from git URL (auto clone to isolated workspace)
-./shannon start URL=https://example.com REPO=https://github.com/your-org/repo.git
+./lumin start URL=https://example.com REPO=https://github.com/your-org/repo.git
 
 # With a configuration file
-./shannon start URL=https://example.com REPO=repo-name CONFIG=./configs/my-config.yaml
+./lumin start URL=https://example.com REPO=repo-name CONFIG=./configs/my-config.yaml
 
 # Custom output directory
-./shannon start URL=https://example.com REPO=repo-name OUTPUT=./my-reports
+./lumin start URL=https://example.com REPO=repo-name OUTPUT=./my-reports
 
 # Safe mode in K8s (default true)
-./shannon start URL=https://example.com REPO=repo-name SAFE_MODE=true
+./lumin start URL=https://example.com REPO=repo-name SAFE_MODE=true
 
 # Allow local git checkpoint/rollback/commit (default is disabled in safe mode)
-./shannon start URL=https://example.com REPO=repo-name SAFE_MODE=false SHANNON_DISABLE_GIT_WRITES=false
+./lumin start URL=https://example.com REPO=repo-name SAFE_MODE=false LUMIN_DISABLE_GIT_WRITES=false
 ```
 
 ### Safe Mode for External Repository Scans
 
-When scanning code provided by others, Shannon supports a safer execution mode:
+When scanning code provided by others, Lumin supports a safer execution mode:
 
 - `SAFE_MODE=true` (default) enables safer defaults.
 - `REPO=<git-url>` clones into an isolated workspace under `./repos/_jobs/`.
 - In safe mode, git push URLs are disabled in the scanned workspace.
-- `SHANNON_DISABLE_GIT_WRITES=true` disables local git checkpoint/rollback/commit during execution.
+- `LUMIN_DISABLE_GIT_WRITES=true` disables local git checkpoint/rollback/commit during execution.
 
 This mode helps avoid accidental changes to shared workspaces and prevents any push to remote repositories.
 
 ### Prepare Your Repository
 
-Shannon expects target repositories to be placed under the `./repos/` directory at the project root. The `REPO` flag refers to a folder name inside `./repos/`. Copy the repository you want to scan into `./repos/`, or clone it directly there:
+Lumin expects target repositories to be placed under the `./repos/` directory at the project root. The `REPO` flag refers to a folder name inside `./repos/`. Copy the repository you want to scan into `./repos/`, or clone it directly there:
 
 ```bash
 git clone https://github.com/your-org/your-repo.git ./repos/your-repo
@@ -226,7 +226,7 @@ Works out of the box with Docker Desktop installed.
 Docker containers cannot reach `localhost` on your host machine. Use `host.docker.internal` in place of `localhost`:
 
 ```bash
-./shannon start URL=http://host.docker.internal:3000 REPO=repo-name
+./lumin start URL=http://host.docker.internal:3000 REPO=repo-name
 ```
 
 ### Configuration (Optional)
@@ -279,9 +279,9 @@ If your application uses two-factor authentication, simply add the TOTP secret t
 
 ### [EXPERIMENTAL - UNSUPPORTED] Router Mode (Alternative Providers)
 
-Shannon can experimentally route requests through alternative AI providers using claude-code-router. This mode is not officially supported and is intended primarily for:
+Lumin can experimentally route requests through alternative AI providers using claude-code-router. This mode is not officially supported and is intended primarily for:
 
-* **Model experimentation** — try Shannon with GPT-5.2 or Gemini 3–family models
+* **Model experimentation** — try Lumin with GPT-5.2 or Gemini 3–family models
 
 #### Quick Setup
 
@@ -300,7 +300,7 @@ ROUTER_DEFAULT=openai,gpt-5.2  # provider,model format
 2. Run with `ROUTER=true`:
 
 ```bash
-./shannon start URL=https://example.com REPO=repo-name ROUTER=true
+./lumin start URL=https://example.com REPO=repo-name ROUTER=true
 ```
 
 #### Experimental Models
@@ -312,7 +312,7 @@ ROUTER_DEFAULT=openai,gpt-5.2  # provider,model format
 
 #### Disclaimer
 
-This feature is experimental and unsupported. Output quality depends heavily on the model. Shannon is built on top of the Anthropic Agent SDK and is optimized and primarily tested with Anthropic Claude models. Alternative providers may produce inconsistent results (including failing early phases like Recon) depending on the model and routing setup.
+This feature is experimental and unsupported. Output quality depends heavily on the model. Lumin is built on top of the Anthropic Agent SDK and is optimized and primarily tested with Anthropic Claude models. Alternative providers may produce inconsistent results (including failing early phases like Recon) depending on the model and routing setup.
 
 ### Output and Results
 
@@ -334,7 +334,7 @@ audit-logs/{hostname}_{sessionId}/
 
 > **Looking for quantitative benchmarks?** [See full benchmark methodology and results →](./xben-benchmark-results/README.md)
 
-See Shannon's capabilities in action with penetration test results from industry-standard vulnerable applications:
+See Lumin's capabilities in action with penetration test results from industry-standard vulnerable applications:
 
 #### 🧃 **OWASP Juice Shop** • [GitHub](https://github.com/juice-shop/juice-shop)
 
@@ -349,7 +349,7 @@ See Shannon's capabilities in action with penetration test results from industry
 - **Identified and exploited systemic authorization flaws (IDOR)** to access and modify any user's private data and shopping cart
 - **Discovered a Server-Side Request Forgery (SSRF)** vulnerability, enabling internal network reconnaissance
 
-📄 **[View Complete Report →](sample-reports/shannon-report-juice-shop.md)**
+📄 **[View Complete Report →](sample-reports/lumin-report-juice-shop.md)**
 
 ---
 
@@ -366,7 +366,7 @@ See Shannon's capabilities in action with penetration test results from industry
 - **Escalated a regular user to full administrator privileges** by exploiting a Mass Assignment vulnerability in the user profile update function
 - **Demonstrated high accuracy** by correctly confirming the application's robust XSS defenses, reporting zero false positives
 
-📄 **[View Complete Report →](sample-reports/shannon-report-capital-api.md)**
+📄 **[View Complete Report →](sample-reports/lumin-report-capital-api.md)**
 
 ---
 
@@ -383,17 +383,17 @@ See Shannon's capabilities in action with penetration test results from industry
 - **Executed a critical Server-Side Request Forgery (SSRF) attack** that successfully forwarded internal authentication tokens to an external service
 - **Demonstrated high accuracy** by correctly identifying the application's robust XSS defenses, reporting zero false positives
 
-📄 **[View Complete Report →](sample-reports/shannon-report-crapi.md)**
+📄 **[View Complete Report →](sample-reports/lumin-report-crapi.md)**
 
 ---
 
-*These results demonstrate Shannon's ability to move beyond simple scanning, performing deep contextual exploitation with minimal false positives and actionable proof-of-concepts.*
+*These results demonstrate Lumin's ability to move beyond simple scanning, performing deep contextual exploitation with minimal false positives and actionable proof-of-concepts.*
 
 ---
 
 ## 🏗️ Architecture
 
-Shannon emulates a human penetration tester's methodology using a sophisticated multi-agent architecture. It combines white-box source code analysis with black-box dynamic exploitation across four distinct phases:
+Lumin emulates a human penetration tester's methodology using a sophisticated multi-agent architecture. It combines white-box source code analysis with black-box dynamic exploitation across four distinct phases:
 
 ```
                     ┌──────────────────────┐
@@ -425,13 +425,13 @@ Shannon emulates a human penetration tester's methodology using a sophisticated 
 
 ### Architectural Overview
 
-Shannon is engineered to emulate the methodology of a human penetration tester. It leverages Anthropic's Claude Agent SDK as its core reasoning engine, but its true strength lies in the sophisticated multi-agent architecture built around it. This architecture combines the deep context of **white-box source code analysis** with the real-world validation of **black-box dynamic exploitation**, managed by an orchestrator through four distinct phases to ensure a focus on minimal false positives and intelligent context management.
+Lumin is engineered to emulate the methodology of a human penetration tester. It leverages Anthropic's Claude Agent SDK as its core reasoning engine, but its true strength lies in the sophisticated multi-agent architecture built around it. This architecture combines the deep context of **white-box source code analysis** with the real-world validation of **black-box dynamic exploitation**, managed by an orchestrator through four distinct phases to ensure a focus on minimal false positives and intelligent context management.
 
 ---
 
 #### **Phase 1: Reconnaissance**
 
-The first phase builds a comprehensive map of the application's attack surface. Shannon analyzes the source code and integrates with tools like Nmap and Subfinder to understand the tech stack and infrastructure. Simultaneously, it performs live application exploration via browser automation to correlate code-level insights with real-world behavior, producing a detailed map of all entry points, API endpoints, and authentication mechanisms for the next phase.
+The first phase builds a comprehensive map of the application's attack surface. Lumin analyzes the source code and integrates with tools like Nmap and Subfinder to understand the tech stack and infrastructure. Simultaneously, it performs live application exploration via browser automation to correlate code-level insights with real-world behavior, producing a detailed map of all entry points, API endpoints, and authentication mechanisms for the next phase.
 
 #### **Phase 2: Vulnerability Analysis**
 
@@ -448,46 +448,46 @@ The final phase compiles all validated findings into a professional, actionable 
 
 ## 📋 Coverage and Roadmap
 
-For detailed information about Shannon's security testing coverage and development roadmap, see our [Coverage and Roadmap](./COVERAGE.md) documentation.
+For detailed information about Lumin's security testing coverage and development roadmap, see our [Coverage and Roadmap](./COVERAGE.md) documentation.
 
 ## ⚠️ Disclaimers
 
 ### Important Usage Guidelines & Disclaimers
 
-Please review the following guidelines carefully before using Shannon (Lite). As a user, you are responsible for your actions and assume all liability.
+Please review the following guidelines carefully before using Lumin (Lite). As a user, you are responsible for your actions and assume all liability.
 
 #### **1. Potential for Mutative Effects & Environment Selection**
 
 This is not a passive scanner. The exploitation agents are designed to **actively execute attacks** to confirm vulnerabilities. This process can have mutative effects on the target application and its data.
 
 > [!WARNING]
-> **⚠️ DO NOT run Shannon on production environments.**
+> **⚠️ DO NOT run Lumin on production environments.**
 >
 > - It is intended exclusively for use on sandboxed, staging, or local development environments where data integrity is not a concern.
 > - Potential mutative effects include, but are not limited to: creating new users, modifying or deleting data, compromising test accounts, and triggering unintended side effects from injection attacks.
 
 #### **2. Legal & Ethical Use**
 
-Shannon is designed for legitimate security auditing purposes only.
+Lumin is designed for legitimate security auditing purposes only.
 
 > [!CAUTION]
-> **You must have explicit, written authorization** from the owner of the target system before running Shannon.
+> **You must have explicit, written authorization** from the owner of the target system before running Lumin.
 >
-> Unauthorized scanning and exploitation of systems you do not own is illegal and can be prosecuted under laws such as the Computer Fraud and Abuse Act (CFAA). Keygraph is not responsible for any misuse of Shannon.
+> Unauthorized scanning and exploitation of systems you do not own is illegal and can be prosecuted under laws such as the Computer Fraud and Abuse Act (CFAA). Keygraph is not responsible for any misuse of Lumin.
 
 #### **3. LLM & Automation Caveats**
 
 - **Verification is Required**: While significant engineering has gone into our "proof-by-exploitation" methodology to eliminate false positives, the underlying LLMs can still generate hallucinated or weakly-supported content in the final report. **Human oversight is essential** to validate the legitimacy and severity of all reported findings.
-- **Comprehensiveness**: The analysis in Shannon Lite may not be exhaustive due to the inherent limitations of LLM context windows. For a more comprehensive, graph-based analysis of your entire codebase, **Shannon Pro** leverages its advanced data flow analysis engine to ensure deeper and more thorough coverage.
+- **Comprehensiveness**: The analysis in Lumin Lite may not be exhaustive due to the inherent limitations of LLM context windows. For a more comprehensive, graph-based analysis of your entire codebase, **Lumin Pro** leverages its advanced data flow analysis engine to ensure deeper and more thorough coverage.
 
 #### **4. Scope of Analysis**
 
-- **Targeted Vulnerabilities**: The current version of Shannon Lite specifically targets the following classes of *exploitable* vulnerabilities:
+- **Targeted Vulnerabilities**: The current version of Lumin Lite specifically targets the following classes of *exploitable* vulnerabilities:
   - Broken Authentication & Authorization
   - Injection
   - Cross-Site Scripting (XSS)
   - Server-Side Request Forgery (SSRF)
-- **What Shannon Lite Does Not Cover**: This list is not exhaustive of all potential security risks. Shannon Lite's "proof-by-exploitation" model means it will not report on issues it cannot actively exploit, such as vulnerable third-party libraries or insecure configurations. These types of deep static-analysis findings are a core focus of the advanced analysis engine in **Shannon Pro**.
+- **What Lumin Lite Does Not Cover**: This list is not exhaustive of all potential security risks. Lumin Lite's "proof-by-exploitation" model means it will not report on issues it cannot actively exploit, such as vulnerable third-party libraries or insecure configurations. These types of deep static-analysis findings are a core focus of the advanced analysis engine in **Lumin Pro**.
 
 #### **5. Cost & Performance**
 
@@ -496,18 +496,18 @@ Shannon is designed for legitimate security auditing purposes only.
 
 #### **6. Windows Antivirus False Positives**
 
-Windows Defender may flag files in `xben-benchmark-results/` or `deliverables/` as malware. These are false positives caused by exploit code in the reports. Add an exclusion for the Shannon directory in Windows Defender, or use Docker/WSL2.
+Windows Defender may flag files in `xben-benchmark-results/` or `deliverables/` as malware. These are false positives caused by exploit code in the reports. Add an exclusion for the Lumin directory in Windows Defender, or use Docker/WSL2.
 
 
 ## 📜 License
 
-Shannon Lite is released under the [GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE).
+Lumin Lite is released under the [GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE).
 
-Shannon is open source (AGPL v3). This license allows you to:
+Lumin is open source (AGPL v3). This license allows you to:
 - Use it freely for all internal security testing.
 - Modify the code privately for internal use without sharing your changes.
 
-The AGPL's sharing requirements primarily apply to organizations offering Shannon as a public or managed service (such as a SaaS platform). In those specific cases, any modifications made to the core software must be open-sourced.
+The AGPL's sharing requirements primarily apply to organizations offering Lumin as a public or managed service (such as a SaaS platform). In those specific cases, any modifications made to the core software must be open-sourced.
 
 
 ## 👥 Community & Support
@@ -517,8 +517,8 @@ The AGPL's sharing requirements primarily apply to organizations offering Shanno
 **Contributing:** At this time, we’re not accepting external code contributions (PRs).  
 Issues are welcome for bug reports and feature requests.
 
-- 🐛 **Report bugs** via [GitHub Issues](https://github.com/KeygraphHQ/shannon/issues)
-- 💡 **Suggest features** in [Discussions](https://github.com/KeygraphHQ/shannon/discussions)
+- 🐛 **Report bugs** via [GitHub Issues](https://github.com/KeygraphHQ/lumin/issues)
+- 💡 **Suggest features** in [Discussions](https://github.com/KeygraphHQ/lumin/discussions)
 - 💬 **Join our [Discord](https://discord.gg/KAqzSHHpRt)** for real-time community support
 
 ### Stay Connected
@@ -531,21 +531,21 @@ Issues are welcome for bug reports and feature requests.
 
 ## 💬 Get in Touch
 
-### Interested in Shannon Pro?
+### Interested in Lumin Pro?
 
-Shannon Pro is designed for organizations serious about application security. It offers enterprise-grade features, dedicated support, and seamless CI/CD integration, all powered by our most advanced LLM-based analysis engine. Find and fix complex vulnerabilities deep in your codebase before they ever reach production.
+Lumin Pro is designed for organizations serious about application security. It offers enterprise-grade features, dedicated support, and seamless CI/CD integration, all powered by our most advanced LLM-based analysis engine. Find and fix complex vulnerabilities deep in your codebase before they ever reach production.
 
 For a detailed breakdown of features, technical differences, and enterprise use cases, see our [complete comparison guide](./SHANNON-PRO.md).
 
 <p align="center">
   <a href="https://docs.google.com/forms/d/e/1FAIpQLSf-cPZcWjlfBJ3TCT8AaWpf8ztsw3FaHzJE4urr55KdlQs6cQ/viewform?usp=header" target="_blank">
-    <img src="https://img.shields.io/badge/📋%20Express%20Interest%20in%20Shannon%20Pro-4285F4?style=for-the-badge&logo=google&logoColor=white" alt="Express Interest">
+    <img src="https://img.shields.io/badge/📋%20Express%20Interest%20in%20Lumin%20Pro-4285F4?style=for-the-badge&logo=google&logoColor=white" alt="Express Interest">
   </a>
 </p>
 
 **Or contact us directly:**
 
-📧 **Email**: [shannon@keygraph.io](mailto:shannon@keygraph.io)
+📧 **Email**: [lumin@keygraph.io](mailto:lumin@keygraph.io)
 
 ---
 
