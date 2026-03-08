@@ -24,17 +24,17 @@ export const displaySplashScreen = async (): Promise<void> => {
     const packageJson = (await fs.readJSON(packagePath)) as { version?: string };
     const version = packageJson.version || '1.0.0';
 
-    // Create the main SHANNON ASCII art
-    // 创建 the main SHANNON ASCII art。
-    const shannonText = figlet.textSync('SHANNON', {
+    // Create the main LUMIN ASCII art
+    // 创建 the main LUMIN ASCII art。
+    const luminText = figlet.textSync('LUMIN', {
       font: 'ANSI Shadow',
       horizontalLayout: 'default',
       verticalLayout: 'default',
     });
 
-    // Apply golden gradient to SHANNON
-    // Apply golden gradient to SHANNON。
-    const gradientShannon = gradient(['#F4C542', '#FFD700'])(shannonText);
+    // Apply golden gradient to LUMIN
+    // Apply golden gradient to LUMIN。
+    const gradientLumin = gradient(['#F4C542', '#FFD700'])(luminText);
 
     // Create minimal tagline with styling
     // 创建 minimal tagline with styling。
@@ -44,7 +44,7 @@ export const displaySplashScreen = async (): Promise<void> => {
     // Build the complete splash content
     // Build the complete splash 内容。
     const content = [
-      gradientShannon,
+      gradientLumin,
       '',
       chalk.bold.cyan('                 ╔════════════════════════════════════╗'),
       chalk.bold.cyan('                 ║') + '  ' + tagline + '  ' + chalk.bold.cyan('║'),
@@ -94,7 +94,7 @@ export const displaySplashScreen = async (): Promise<void> => {
     // Fallback to simple splash if anything fails
     // 回退 to simple splash 如果 anything fails。
     const errMsg = error instanceof Error ? error.message : String(error);
-    console.log(chalk.cyan.bold('\n🚀 SHANNON - AI Penetration Testing Framework\n'));
+    console.log(chalk.cyan.bold('\n🚀 LUMIN - AI Penetration Testing Framework\n'));
     console.log(chalk.yellow('⚠️  Could not load full splash screen:', errMsg));
     console.log('');
   }
