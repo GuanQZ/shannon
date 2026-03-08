@@ -194,4 +194,4 @@ RUN git config --global user.email "agent@localhost" && \
     git config --global --add safe.directory '*'
 
 # Set entrypoint
-ENTRYPOINT ["node", "dist/shannon.js"]
+ENTRYPOINT ["node", "dist/lumin.js"]

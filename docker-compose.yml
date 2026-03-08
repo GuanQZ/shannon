@@ -47,7 +47,7 @@ services:
       - seccomp:unconfined
 
   # Optional: claude-code-router for multi-model support
-  # Start with: ROUTER=true ./shannon start ...
+  # Start with: ROUTER=true ./lumin start ...
   router:
     image: node:20-slim
     profiles: ["router"]  # Only starts when explicitly requested
@@ -75,9 +75,9 @@ services:
       retries: 5
       start_period: 30s
 
-  # Shannon-target vulnerable application
-  shannon-target:
-    build: ./repos/shannon-target
+  # Lumin-target vulnerable application
+  lumin-target:
+    build: ./repos/lumin-target
     ports:
       - "8080:8080"
     healthcheck:
