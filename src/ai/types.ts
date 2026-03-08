@@ -4,7 +4,14 @@
 // it under the terms of the GNU Affero General Public License version 3
 // as published by the Free Software Foundation.
 
+/**
+ * 文件说明：
+ * 定义 AI 执行链路中的消息、回调、上下文等核心类型，约束执行器与处理器之间的数据契约。
+ * 该文件用于提升编译期安全性，降低跨模块数据结构漂移风险。
+ */
+
 // Type definitions for Claude executor message processing pipeline
+// 类型 definitions for Claude executor 消息 processing 流水线。
 
 export interface ExecutionContext {
   isParallelExecution: boolean;
@@ -44,6 +51,7 @@ export interface AssistantResult {
 export interface ResultData {
   result: string | null;
   cost: number;
+  total_tokens: number;
   duration_ms: number;
   subtype?: string;
   stop_reason?: string | null;
@@ -88,6 +96,7 @@ export interface ResultMessage {
   type: 'result';
   result?: string;
   total_cost_usd?: number;
+  total_tokens?: number;
   duration_ms?: number;
   subtype?: string;
   stop_reason?: string | null;
@@ -111,6 +120,7 @@ export interface ApiErrorDetection {
 }
 
 // Message types from SDK stream
+// SDK 流式消息类型。
 export type SdkMessage =
   | AssistantMessage
   | ResultMessage
@@ -132,6 +142,7 @@ export interface UserMessage {
 }
 
 // Dispatch result types for message processing
+// 消息处理分发结果类型。
 export type MessageDispatchResult =
   | { action: 'continue' }
   | { action: 'break'; result: string | null; cost: number }
