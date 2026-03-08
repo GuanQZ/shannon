@@ -4,6 +4,12 @@
 // it under the terms of the GNU Affero General Public License version 3
 // as published by the Free Software Foundation.
 
+/**
+ * 文件说明：
+ * 负责校验代理执行队列与交付物依赖关系，确保漏洞分析与利用阶段按既定顺序推进。
+ * 通过前置约束检查，减少“缺少输入就执行下一步”导致的无效调用和结果污染。
+ */
+
 import { fs, path } from 'zx';
 import { PentestError } from './error-handling.js';
 import { asyncPipe } from './utils/functional.js';
@@ -74,6 +80,7 @@ export interface SafeValidationResult {
 }
 
 // Vulnerability type configuration as immutable data
+// 漏洞 类型 配置 as immutable data。
 const VULN_TYPE_CONFIG: VulnTypeConfig = Object.freeze({
   injection: Object.freeze({
     deliverable: 'injection_analysis_deliverable.md',
@@ -98,6 +105,7 @@ const VULN_TYPE_CONFIG: VulnTypeConfig = Object.freeze({
 }) as VulnTypeConfig;
 
 // Pure function to create validation rule
+// 纯函数：用于创建校验规则。
 function createValidationRule(
   predicate: (existence: FileExistence) => boolean,
   errorMessage: ErrorMessageResolver,
@@ -107,6 +115,7 @@ function createValidationRule(
 }
 
 // Symmetric deliverable rules: queue and deliverable must exist together (prevents partial analysis from triggering exploitation)
+// 对称规则：队列与交付物必须同时存在，避免“部分分析结果”误触发利用阶段。
 const fileExistenceRules: readonly ValidationRule[] = Object.freeze([
   createValidationRule(
     ({ deliverableExists, queueExists }) => deliverableExists && queueExists,
@@ -115,6 +124,7 @@ const fileExistenceRules: readonly ValidationRule[] = Object.freeze([
 ]);
 
 // Generate appropriate error message based on which files are missing
+// 根据缺失文件情况生成对应错误消息。
 function getExistenceErrorMessage(existence: FileExistence): string {
   const { deliverableExists, queueExists } = existence;
 
@@ -128,6 +138,7 @@ function getExistenceErrorMessage(existence: FileExistence): string {
 }
 
 // Pure function to create file paths
+// 纯函数：用于创建文件路径。
 const createPaths = (
   vulnType: VulnType,
   sourceDir: string
@@ -153,6 +164,7 @@ const createPaths = (
 };
 
 // Pure function to check file existence
+// 纯函数：用于检查文件是否存在。
 const checkFileExistence = async (
   paths: PathsBase | PathsWithError
 ): Promise<PathsWithExistence | PathsWithError> => {
@@ -170,6 +182,7 @@ const checkFileExistence = async (
 };
 
 // Validates deliverable/queue symmetry - both must exist or neither
+// Validates 交付物/队列 symmetry - both must exist or neither。
 const validateExistenceRules = (
   pathsWithExistence: PathsWithExistence | PathsWithError
 ): PathsWithExistence | PathsWithError => {
@@ -178,6 +191,7 @@ const validateExistenceRules = (
   const { existence, vulnType } = pathsWithExistence;
 
   // Find the first rule that fails
+  // Find the first 规则 that fails。
   const failedRule = fileExistenceRules.find((rule) => !rule.predicate(existence));
 
   if (failedRule) {
@@ -205,6 +219,7 @@ const validateExistenceRules = (
 };
 
 // Pure function to validate queue structure
+// 纯函数：用于校验队列结构。
 const validateQueueStructure = (content: string): QueueValidationResult => {
   try {
     const parsed = JSON.parse(content) as unknown;
@@ -229,6 +244,7 @@ const validateQueueStructure = (content: string): QueueValidationResult => {
 };
 
 // Queue parse failures are retryable - agent can fix malformed JSON on retry
+// 队列 解析 failures are retryable - 代理 can fix malformed JSON 于 重试。
 const validateQueueContent = async (
   pathsWithExistence: PathsWithExistence | PathsWithError
 ): Promise<PathsWithQueue | PathsWithError> => {
@@ -240,6 +256,7 @@ const validateQueueContent = async (
 
     if (!queueValidation.valid) {
       // Rule 6: Both exist, queue invalid
+      // 规则 6: Both exist, 队列 invalid。
       return {
         error: new PentestError(
           queueValidation.error
@@ -278,6 +295,7 @@ const validateQueueContent = async (
 };
 
 // Final decision: skip if queue says no vulns, proceed if vulns found, error otherwise
+// Final decision: 跳过 如果 队列 says no vulns, proceed 如果 vulns found, 错误 otherwise。
 const determineExploitationDecision = (
   validatedData: PathsWithQueue | PathsWithError
 ): ExploitationDecision => {
@@ -288,7 +306,9 @@ const determineExploitationDecision = (
   const hasVulnerabilities = validatedData.queueData.vulnerabilities.length > 0;
 
   // Rule 4: Both exist, queue valid and populated
+  // 规则 4: Both exist, 队列 valid and populated。
   // Rule 5: Both exist, queue valid but empty
+  // 规则 5: Both exist, 队列 valid but empty。
   return Object.freeze({
     shouldExploit: hasVulnerabilities,
     shouldRetry: false,
@@ -298,6 +318,7 @@ const determineExploitationDecision = (
 };
 
 // Main functional validation pipeline
+// 主功能校验流程。
 export async function validateQueueAndDeliverable(
   vulnType: VulnType,
   sourceDir: string
@@ -312,6 +333,7 @@ export async function validateQueueAndDeliverable(
 }
 
 // Pure function to safely validate (returns result instead of throwing)
+// 纯函数：以结果对象形式返回校验结论，不直接抛出异常。
 export const safeValidateQueueAndDeliverable = async (
   vulnType: VulnType,
   sourceDir: string

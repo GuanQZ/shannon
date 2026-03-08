@@ -4,7 +4,27 @@
 // it under the terms of the GNU Affero General Public License version 3
 // as published by the Free Software Foundation.
 
+/**
+ * 文件说明：
+ * 实现 `AI` 代理核心执行器，负责提示词装配、模型调用、消息流消费、失败重试与 `Git` 状态收敛。
+ * 入口函数负责驱动单个 `agent` 的完整生命周期：执行、校验、提交或回滚。
+ *
+ * 关键输入：
+ * - `prompt` / `context`：模型任务内容与重试补充上下文。
+ * - `sourceDir`：目标仓库路径，供模型工具调用与产物校验。
+ * - `agentName`：用于选择校验器、`MCP` 工具映射和日志标识。
+ *
+ * 返回结果：
+ * - 成功时返回文本结果、成本、轮次、耗时与模型信息。
+ * - 失败时返回错误类别与是否可重试，供 `Temporal` 上层决策。
+ *
+ * 边界与分支：
+ * - 容器模式下切换 `Playwright` 浏览器参数，避免运行时下载失败。
+ * - 低成本且极少轮次的异常结果会触发兜底判定，防止把额度异常当作成功。
+ */
+
 // Production Claude agent execution with retry, git checkpoints, and audit logging
+// 生产级执行器实现，强调稳定性、可回滚与可审计。
 
 import { fs, path } from 'zx';
 import chalk, { type ChalkInstance } from 'chalk';
@@ -56,6 +76,7 @@ interface StdioMcpServer {
 type McpServer = ReturnType<typeof createShannonHelperServer> | StdioMcpServer;
 
 // Configures MCP servers for agent execution, with Docker-specific Chromium handling
+// 根据 `agent` 类型动态装配 `MCP` 工具；在容器环境切换浏览器启动参数。
 function buildMcpServers(
   sourceDir: string,
   agentName: string | null
@@ -76,6 +97,7 @@ function buildMcpServers(
       const userDataDir = `/tmp/${playwrightMcpName}`;
 
       // Docker uses system Chromium; local dev uses Playwright's bundled browsers
+      // 容器环境中优先使用系统浏览器，避免运行时下载浏览器依赖失败。
       const isDocker = process.env.SHANNON_DOCKER === 'true';
 
       const mcpArgs: string[] = [
@@ -85,6 +107,7 @@ function buildMcpServers(
       ];
 
       // Docker: Use system Chromium; Local: Use Playwright's bundled browsers
+      // 通过命令参数切换浏览器来源，保持本地与容器行为一致。
       if (isDocker) {
         mcpArgs.push('--executable-path', '/usr/bin/chromium-browser');
         mcpArgs.push('--browser', 'chromium');
@@ -122,6 +145,8 @@ async function writeErrorLog(
   fullPrompt: string,
   duration: number
 ): Promise<void> {
+  // 将失败上下文追加写入 `error.log`，便于离线排障。
+  // `fullPrompt` 仅保留前缀片段，避免日志体积过大或泄露过多上下文。
   try {
     const errorLog = {
       timestamp: formatTimestamp(),
@@ -154,15 +179,19 @@ export async function validateAgentOutput(
   sourceDir: string
 ): Promise<boolean> {
   console.log(chalk.blue(`    Validating ${agentName} agent output`));
+  // 验证器只关注“必须产物是否存在/结构是否正确”，
+  // 不判断模型文本质量，职责边界清晰。
 
   try {
     // Check if agent completed successfully
+    // 先做快速失败判定，避免无意义校验。
     if (!result.success || !result.result) {
       console.log(chalk.red(`    Validation failed: Agent execution was unsuccessful`));
       return false;
     }
 
     // Get validator function for this agent
+    // 按 `agentName` 在常量映射表中选择对应校验器。
     const validator = agentName ? AGENT_VALIDATORS[agentName as keyof typeof AGENT_VALIDATORS] : undefined;
 
     if (!validator) {
@@ -175,6 +204,7 @@ export async function validateAgentOutput(
     console.log(chalk.blue(`    Source directory: ${sourceDir}`));
 
     // Apply validation function
+    // 真正执行文件/结构校验逻辑。
     const validationResult = await validator(sourceDir);
 
     if (validationResult) {
@@ -193,7 +223,9 @@ export async function validateAgentOutput(
 }
 
 // Low-level SDK execution. Handles message streaming, progress, and audit logging.
+// 低层执行函数：负责消费 `SDK` 消息流，并同步更新进度与审计日志。
 // Exported for Temporal activities to call single-attempt execution.
+// 该入口只负责单次执行（不含重试循环），重试策略由上层决定。
 export async function runClaudePrompt(
   prompt: string,
   sourceDir: string,
@@ -206,6 +238,7 @@ export async function runClaudePrompt(
   attemptNumber: number = 1
 ): Promise<ClaudePromptResult> {
   const timer = new Timer(`agent-${description.toLowerCase().replace(/\s+/g, '-')}`);
+  // `fullPrompt` = context + prompt，用于重试时携带历史补充信息。
   const fullPrompt = context ? `${context}\n\n${prompt}` : prompt;
 
   const execContext = detectExecutionContext(description);
@@ -215,14 +248,26 @@ export async function runClaudePrompt(
   );
   const auditLogger = createAuditLogger(auditSession);
 
-  console.log(chalk.blue(`  Running Claude Code: ${description}...`));
+  console.log(chalk.blue(`  正在执行 Claude Code：${description}...`));
 
   const mcpServers = buildMcpServers(sourceDir, agentName);
 
   // Build env vars to pass to SDK subprocesses
+  // 仅透传必要凭证变量，减少子进程环境噪声。
   const sdkEnv: Record<string, string> = {};
   if (process.env.ANTHROPIC_API_KEY) {
     sdkEnv.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  }
+  // Support third-party Anthropic-compatible APIs (MiniMax, DeepSeek, Kimi, etc.)
+  if (process.env.ANTHROPIC_BASE_URL) {
+    sdkEnv.ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL;
+  }
+  if (process.env.ANTHROPIC_MODEL) {
+    sdkEnv.ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL;
+  }
+  // ANTHROPIC_AUTH_TOKEN is used by some third-party providers
+  if (process.env.ANTHROPIC_AUTH_TOKEN) {
+    sdkEnv.ANTHROPIC_AUTH_TOKEN = process.env.ANTHROPIC_AUTH_TOKEN;
   }
   if (process.env.CLAUDE_CODE_OAUTH_TOKEN) {
     sdkEnv.CLAUDE_CODE_OAUTH_TOKEN = process.env.CLAUDE_CODE_OAUTH_TOKEN;
@@ -239,7 +284,7 @@ export async function runClaudePrompt(
   };
 
   if (!execContext.useCleanOutput) {
-    console.log(chalk.gray(`    SDK Options: maxTurns=${options.maxTurns}, cwd=${sourceDir}, permissions=BYPASS`));
+    console.log(chalk.gray(`    SDK 参数：maxTurns=${options.maxTurns}，cwd=${sourceDir}，permissions=BYPASS`));
   }
 
   let turnCount = 0;
@@ -264,10 +309,15 @@ export async function runClaudePrompt(
     const model = messageLoopResult.model;
 
     // === SPENDING CAP SAFEGUARD ===
+    // === SPENDING CAP SAFEGUARD ===。
     // Defense-in-depth: Detect spending cap that slipped through detectApiError().
+    // 即便消息分发层漏判，也在执行收口处再次防守。
     // When spending cap is hit, Claude returns a short message with $0 cost.
+    // 这是典型异常信号，需要转换为可重试的计费错误。
     // Legitimate agent work NEVER costs $0 with only 1-2 turns.
+    // 利用该启发式降低“假成功”写入后续流程的风险。
     if (turnCount <= 2 && totalCost === 0) {
+      // 极少轮次 + 零成本 + 关键词命中，高概率为计费上限触发。
       const resultLower = (result || '').toLowerCase();
       const BILLING_KEYWORDS = ['spending', 'cap', 'limit', 'budget', 'resets'];
       const looksLikeBillingError = BILLING_KEYWORDS.some((kw) =>
@@ -287,7 +337,7 @@ export async function runClaudePrompt(
     timingResults.agents[execContext.agentKey] = duration;
 
     if (apiErrorDetected) {
-      console.log(chalk.yellow(`  API Error detected in ${description} - will validate deliverables before failing`));
+      console.log(chalk.yellow(`  在 ${description} 中检测到 API 异常——失败前将先校验交付物`));
     }
 
     progress.finish(formatCompletionMessage(execContext, description, turnCount, duration));
@@ -336,10 +386,15 @@ interface MessageLoopResult {
 }
 
 interface MessageLoopDeps {
+  // `execContext`：控制输出策略与 `agent` 标识。
   execContext: ReturnType<typeof detectExecutionContext>;
+  // `description`：当前任务描述，用于终端与日志展示。
   description: string;
+  // `colorFn`：控制台着色函数。
   colorFn: ChalkInstance;
+  // `progress`：进度管理器（转圈实现或空操作实现）。
   progress: ReturnType<typeof createProgressManager>;
+  // `auditLogger`：审计日志适配器。
   auditLogger: ReturnType<typeof createAuditLogger>;
 }
 
@@ -351,6 +406,7 @@ async function processMessageStream(
 ): Promise<MessageLoopResult> {
   const { execContext, description, colorFn, progress, auditLogger } = deps;
   const HEARTBEAT_INTERVAL = 30000;
+  // 关闭进度显示器时每三十秒打印一次心跳日志，防止“无输出假死”观感。
 
   let turnCount = 0;
   let result: string | null = null;
@@ -361,6 +417,7 @@ async function processMessageStream(
 
   for await (const message of query({ prompt: fullPrompt, options })) {
     // Heartbeat logging when loader is disabled
+    // 在长任务期间定时反馈“仍在运行”。
     const now = Date.now();
     if (global.SHANNON_DISABLE_LOADER && now - lastHeartbeat > HEARTBEAT_INTERVAL) {
       console.log(chalk.blue(`    [${Math.floor((now - timer.startTime) / 1000)}s] ${description} running... (Turn ${turnCount})`));
@@ -368,6 +425,7 @@ async function processMessageStream(
     }
 
     // Increment turn count for assistant messages
+    // 按 `assistant` 消息累计轮次，作为成本与异常判断输入。
     if (message.type === 'assistant') {
       turnCount++;
     }
@@ -393,6 +451,7 @@ async function processMessageStream(
         apiErrorDetected = true;
       }
       // Capture model from SystemInitMessage, but override with router model if applicable
+      // 路由模式下使用“实际模型名”覆盖 `SDK` 报告值。
       if (dispatchResult.model) {
         model = getActualModelName(dispatchResult.model);
       }
@@ -403,6 +462,7 @@ async function processMessageStream(
 }
 
 // Main entry point for agent execution. Handles retries, git checkpoints, and validation.
+// 高层重试入口，封装“检查点 -> 执行 -> 校验 -> 提交或回滚”的完整闭环。
 export async function runClaudePromptWithRetry(
   prompt: string,
   sourceDir: string,
@@ -414,6 +474,7 @@ export async function runClaudePromptWithRetry(
   sessionMetadata: SessionMetadata | null = null
 ): Promise<ClaudePromptResult> {
   const maxRetries = 3;
+  // 默认最多 3 次，平衡成功率与成本。
   let lastError: Error | undefined;
   let retryContext = context;
 
@@ -426,6 +487,7 @@ export async function runClaudePromptWithRetry(
   }
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    // 每次重试前都创建 `git` 检查点，保证可回溯。
     await createGitCheckpoint(sourceDir, description, attempt);
 
     if (auditSession && agentName) {
@@ -471,6 +533,7 @@ export async function runClaudePromptWithRetry(
           console.log(chalk.green.bold(`${description} completed successfully on attempt ${attempt}/${maxRetries}`));
           return result;
         // Validation failure is retryable - agent might succeed on retry with cleaner workspace
+        // 交付物缺失常见于中间步骤中断，清理工作区后重试通常可以恢复。
         } else {
           console.log(chalk.yellow(`${description} completed but output validation failed`));
 
@@ -522,12 +585,15 @@ export async function runClaudePromptWithRetry(
       }
 
       if (!isRetryableError(err)) {
+        // 不可重试错误立即终止，并执行一次清理回滚。
         console.log(chalk.red(`${description} failed with non-retryable error: ${err.message}`));
         await rollbackGitWorkspace(sourceDir, 'non-retryable error cleanup');
         throw err;
       }
 
       if (attempt < maxRetries) {
+        // 可重试错误执行指数退避等待，并可附带 partialResults 作为下一轮上下文。
+        // 这里先回滚工作区，再进入指数退避等待，避免脏状态传播到下一轮。
         await rollbackGitWorkspace(sourceDir, 'retryable error cleanup');
 
         const delay = getRetryDelay(err, attempt);

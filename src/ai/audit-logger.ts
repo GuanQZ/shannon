@@ -4,7 +4,14 @@
 // it under the terms of the GNU Affero General Public License version 3
 // as published by the Free Software Foundation.
 
+/**
+ * 文件说明：
+ * 为 AI 执行过程提供审计日志适配层，封装“启用/禁用审计”两种模式的统一调用接口。
+ * 该文件通过空对象模式降低调用方分支判断复杂度，保证日志链路稳定。
+ */
+
 // Null Object pattern for audit logging - callers never check for null
+// 审计日志采用空对象模式，调用方无需判空。
 
 import type { AuditSession } from '../audit/index.js';
 import { formatTimestamp } from '../utils/formatting.js';
@@ -59,6 +66,7 @@ class RealAuditLogger implements AuditLogger {
 }
 
 /** Null Object implementation - all methods are safe no-ops */
+/* * 空值 对象 implementation - all methods are 安全 no-ops。 */
 class NullAuditLogger implements AuditLogger {
   async logLlmResponse(_turn: number, _content: string): Promise<void> {}
 
@@ -70,6 +78,7 @@ class NullAuditLogger implements AuditLogger {
 }
 
 // Returns no-op when auditSession is null
+// 当 auditSession 为空时返回空操作实现。
 export function createAuditLogger(auditSession: AuditSession | null): AuditLogger {
   if (auditSession) {
     return new RealAuditLogger(auditSession);

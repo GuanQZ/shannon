@@ -4,12 +4,25 @@
 // it under the terms of the GNU Affero General Public License version 3
 // as published by the Free Software Foundation.
 
+/**
+ * 文件说明：
+ * 管理执行过程中的 Git 检查点、提交与回滚，确保 agent 变更可追踪且可恢复。
+ * 该文件是“自动化执行安全护栏”的关键组成。
+ */
+
 import { $ } from 'zx';
 import chalk from 'chalk';
 
+function isGitWritesDisabled(): boolean {
+  const value = process.env.SHANNON_DISABLE_GIT_WRITES?.toLowerCase().trim();
+  return value === '1' || value === 'true' || value === 'yes';
+}
+
 /**
  * Check if a directory is a git repository.
+ * 检查 如果 a directory is a git repository.。
  * Returns true if the directory contains a .git folder or is inside a git repo.
+ * 返回 true 如果 the directory contains a .git folder or is inside a git repo.。
  */
 export async function isGitRepository(dir: string): Promise<boolean> {
   try {
@@ -28,6 +41,7 @@ interface GitOperationResult {
 
 /**
  * Get list of changed files from git status --porcelain output
+ * Get list of changed 文件 来自 git status --porcelain output。
  */
 async function getChangedFiles(
   sourceDir: string,
@@ -46,6 +60,7 @@ async function getChangedFiles(
 
 /**
  * Log a summary of changed files with truncation for long lists
+ * Log a summary of changed 文件 with truncation for long lists。
  */
 function logChangeSummary(
   changes: string[],
@@ -67,6 +82,7 @@ function logChangeSummary(
 
 /**
  * Convert unknown error to GitOperationResult
+ * Convert unknown 错误 to GitOperationResult。
  */
 function toErrorResult(error: unknown): GitOperationResult {
   const errMsg = error instanceof Error ? error.message : String(error);
@@ -77,6 +93,7 @@ function toErrorResult(error: unknown): GitOperationResult {
 }
 
 // Serializes git operations to prevent index.lock conflicts during parallel agent execution
+// Serializes git operations to 防止 index.lock conflicts during 并行 代理 execution。
 class GitSemaphore {
   private queue: Array<() => void> = [];
   private running: boolean = false;
@@ -117,6 +134,7 @@ function isGitLockError(errorMessage: string): boolean {
 }
 
 // Retries git commands on lock conflicts with exponential backoff
+// Retries git commands 于 lock conflicts with exponential backoff。
 export async function executeGitCommandWithRetry(
   commandArgs: string[],
   sourceDir: string,
@@ -155,11 +173,18 @@ export async function executeGitCommandWithRetry(
 }
 
 // Two-phase reset: hard reset (tracked files) + clean (untracked files)
+// Two-阶段 reset: hard reset (tracked 文件) + clean (untracked 文件)。
 export async function rollbackGitWorkspace(
   sourceDir: string,
   reason: string = 'retry preparation'
 ): Promise<GitOperationResult> {
+  if (isGitWritesDisabled()) {
+    console.log(chalk.gray('    ⏭️  已启用 SHANNON_DISABLE_GIT_WRITES，跳过 git 回滚'));
+    return { success: true };
+  }
+
   // Skip git operations if not a git repository
+  // 跳过 git operations 如果 not a git repository。
   if (!(await isGitRepository(sourceDir))) {
     console.log(chalk.gray(`    ⏭️  Skipping git rollback (not a git repository)`));
     return { success: true };
@@ -196,12 +221,19 @@ export async function rollbackGitWorkspace(
 }
 
 // Creates checkpoint before each attempt. First attempt preserves workspace; retries clean it.
+// Creates checkpoint before 每个 attempt. First attempt preserves workspace; retries clean it.。
 export async function createGitCheckpoint(
   sourceDir: string,
   description: string,
   attempt: number
 ): Promise<GitOperationResult> {
+  if (isGitWritesDisabled()) {
+    console.log(chalk.gray('    ⏭️  已启用 SHANNON_DISABLE_GIT_WRITES，跳过 git checkpoint'));
+    return { success: true };
+  }
+
   // Skip git operations if not a git repository
+  // 跳过 git operations 如果 not a git repository。
   if (!(await isGitRepository(sourceDir))) {
     console.log(chalk.gray(`    ⏭️  Skipping git checkpoint (not a git repository)`));
     return { success: true };
@@ -210,6 +242,7 @@ export async function createGitCheckpoint(
   console.log(chalk.blue(`    📍 Creating checkpoint for ${description} (attempt ${attempt})`));
   try {
     // First attempt: preserve existing deliverables. Retries: clean workspace to prevent pollution
+    // First attempt: preserve existing deliverables. Retries: clean workspace to 防止 pollution。
     if (attempt > 1) {
       const cleanResult = await rollbackGitWorkspace(sourceDir, `${description} (retry cleanup)`);
       if (!cleanResult.success) {
@@ -246,7 +279,13 @@ export async function commitGitSuccess(
   sourceDir: string,
   description: string
 ): Promise<GitOperationResult> {
+  if (isGitWritesDisabled()) {
+    console.log(chalk.gray('    ⏭️  已启用 SHANNON_DISABLE_GIT_WRITES，跳过 git success commit'));
+    return { success: true };
+  }
+
   // Skip git operations if not a git repository
+  // 跳过 git operations 如果 not a git repository。
   if (!(await isGitRepository(sourceDir))) {
     console.log(chalk.gray(`    ⏭️  Skipping git commit (not a git repository)`));
     return { success: true };
@@ -284,7 +323,9 @@ export async function commitGitSuccess(
 
 /**
  * Get current git commit hash.
+ * Get current git commit hash.。
  * Returns null if not a git repository.
+ * 返回 空值 如果 not a git repository.。
  */
 export async function getGitCommitHash(sourceDir: string): Promise<string | null> {
   if (!(await isGitRepository(sourceDir))) {

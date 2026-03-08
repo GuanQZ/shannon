@@ -1,0 +1,156 @@
+/* Custom PDF Styles for Shannon Security Reports */
+
+/* Set default font for Chinese characters */
+body {
+  font-family: 'Noto Sans CJK SC', 'Noto Sans SC', 'Open Sans', Arial, sans-serif;
+  font-size: 12pt;
+  line-height: 1.6;
+  color: #333;
+}
+
+/* Headers */
+h1 {
+  font-size: 24pt;
+  font-weight: bold;
+  color: #1a1a1a;
+  border-bottom: 2px solid #0066cc;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+  page-break-after: avoid;
+}
+
+h2 {
+  font-size: 18pt;
+  font-weight: bold;
+  color: #2c2c2c;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 6px;
+  margin-top: 20px;
+  margin-bottom: 12px;
+  page-break-after: avoid;
+}
+
+h3 {
+  font-size: 14pt;
+  font-weight: bold;
+  color: #3c3c3c;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  page-break-after: avoid;
+}
+
+h4 {
+  font-size: 12pt;
+  font-weight: bold;
+  color: #4c4c4c;
+  margin-top: 12px;
+  margin-bottom: 6px;
+}
+
+/* Paragraphs */
+p {
+  margin-bottom: 10px;
+  text-align: justify;
+}
+
+/* Code blocks */
+pre, code {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 10pt;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
+
+pre {
+  padding: 12px;
+  overflow-x: auto;
+  border: 1px solid #ddd;
+  page-break-inside: avoid;
+}
+
+code {
+  padding: 2px 6px;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  page-break-inside: avoid;
+}
+
+th, td {
+  border: 1px solid #ddd;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+th {
+  background-color: #f0f0f0;
+  font-weight: bold;
+}
+
+tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+/* Lists */
+ul, ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+li {
+  margin-bottom: 4px;
+}
+
+/* Images */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 12px auto;
+  page-break-inside: avoid;
+}
+
+/* Blockquotes */
+blockquote {
+  border-left: 4px solid #0066cc;
+  margin: 12px 0;
+  padding: 8px 16px;
+  background-color: #f9f9f9;
+  font-style: italic;
+}
+
+/* Horizontal rules */
+hr {
+  border: none;
+  border-top: 1px solid #ddd;
+  margin: 16px 0;
+}
+
+/* Page breaks */
+.page-break {
+  page-break-after: always;
+}
+
+/* High severity indicators */
+.severity-critical {
+  color: #d32f2f;
+  font-weight: bold;
+}
+
+.severity-high {
+  color: #f57c00;
+  font-weight: bold;
+}
+
+.severity-medium {
+  color: #fbc02d;
+  font-weight: bold;
+}
+
+.severity-low {
+  color: #388e3c;
+}

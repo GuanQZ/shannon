@@ -1,0 +1,250 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #0d1117;
+  color: #e6edf3;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.container {
+  display: grid;
+  grid-template-columns: 150px 1fr 280px;
+  grid-template-rows: 60px 1fr;
+  height: 100vh;
+}
+
+.header {
+  grid-column: 1 / -1;
+  background: #161b22;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  border-bottom: 1px solid #30363d;
+}
+
+.header h1 {
+  font-size: 18px;
+  color: #58a6ff;
+}
+
+.session-select {
+  background: #0d1117;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  margin-left: 16px;
+  max-width: 300px;
+}
+
+.session-select:focus {
+  outline: none;
+  border-color: #58a6ff;
+}
+
+.status {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+.status.connected {
+  background: #238636;
+  color: white;
+}
+
+.status.disconnected {
+  background: #da3633;
+  color: white;
+}
+
+.toggle-btn {
+  background: #21262d;
+  color: #e6edf3;
+  border: 1px solid #30363d;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: 16px;
+  transition: all 0.2s;
+}
+
+.toggle-btn:hover {
+  background: #30363d;
+  border-color: #484f58;
+}
+
+.toggle-btn.active {
+  background: #1f6feb;
+  border-color: #388bfd;
+}
+
+/* 筛选的日志样式 */
+.log-entry.filtered {
+  display: none;
+  background: #161b22;
+  border-left: 3px solid #484f58;
+}
+
+.log-entry.filtered.show {
+  display: block;
+}
+
+.log-entry.tool_use {
+  color: #a371f7;
+}
+
+.log-entry.tool_result {
+  color: #7ee787;
+}
+
+.sidebar-left, .sidebar-right {
+  background: #161b22;
+  padding: 16px;
+  overflow-y: auto;
+  border-right: 1px solid #30363d;
+}
+
+.sidebar-right {
+  border-right: none;
+  border-left: 1px solid #30363d;
+}
+
+.sidebar-left h3, .sidebar-right h3 {
+  font-size: 14px;
+  color: #58a6ff;
+  margin-bottom: 16px;
+}
+
+.main-content {
+  padding: 16px;
+  overflow-y: auto;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 阶段进度 */
+.phase-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.phase-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.phase-dot.pending { background: #484f58; }
+.phase-dot.running {
+  background: #d29922;
+  animation: pulse 1.5s infinite;
+}
+.phase-dot.completed { background: #238636; }
+.phase-dot.failed { background: #da3633; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.phase-name { font-size: 13px; }
+.phase-status { font-size: 11px; color: #8b949e; margin-left: 6px; }
+
+/* Agent列表 */
+.agent-group { margin-bottom: 12px; }
+
+.group-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.group-header:hover { background: #21262d; }
+
+.group-toggle {
+  margin-right: 8px;
+  font-size: 10px;
+  color: #8b949e;
+}
+
+.group-name { flex: 1; font-size: 13px; }
+.group-count { font-size: 11px; color: #8b949e; }
+
+.agent-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px 4px 24px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.agent-item:hover { background: #21262d; }
+
+.agent-item.active {
+  background: #1f6feb;
+  color: white;
+}
+
+.agent-check { color: #238636; }
+
+/* 日志 */
+.log-entry {
+  padding: 4px 0;
+  border-bottom: 1px solid #21262d;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.log-time {
+  color: #8b949e;
+  margin-right: 8px;
+  font-size: 11px;
+}
+
+.log-agent {
+  color: #58a6ff;
+  margin-right: 8px;
+}
+
+.log-content { color: #e6edf3; }
+
+.log-entry.thinking .log-content {
+  color: #8b949e;
+  font-style: italic;
+}
+
+.log-empty {
+  color: #8b949e;
+  text-align: center;
+  padding: 40px;
+}
+
+/* 响应式 */
+@media (max-width: 1024px) {
+  .container { grid-template-columns: 120px 1fr 220px; }
+}
+
+@media (max-width: 768px) {
+  .container {
+    grid-template-columns: 1fr;
+    grid-template-rows: 60px auto 1fr auto;
+  }
+  .sidebar-left, .sidebar-right { display: none; }
+}

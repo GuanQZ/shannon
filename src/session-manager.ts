@@ -4,10 +4,17 @@
 // it under the terms of the GNU Affero General Public License version 3
 // as published by the Free Software Foundation.
 
+/**
+ * 文件说明：
+ * 定义全部代理角色、执行顺序、并行分组与阶段映射，是渗透流水线的“任务拓扑中心”。
+ * 该文件决定了各 agent 的依赖关系与编排规则，直接影响流程正确性与并行效率。
+ */
+
 import { path } from 'zx';
 import type { AgentName } from './types/index.js';
 
 // Agent definition interface
+// 代理 definition interface。
 export interface AgentDefinition {
   name: AgentName;
   displayName: string;
@@ -15,6 +22,7 @@ export interface AgentDefinition {
 }
 
 // Agent definitions according to PRD
+// 代理 definitions according to PRD。
 export const AGENTS: Readonly<Record<AgentName, AgentDefinition>> = Object.freeze({
   'pre-recon': {
     name: 'pre-recon',
@@ -84,6 +92,7 @@ export const AGENTS: Readonly<Record<AgentName, AgentDefinition>> = Object.freez
 });
 
 // Agent execution order
+// 代理 execution order。
 export const AGENT_ORDER: readonly AgentName[] = Object.freeze([
   'pre-recon',
   'recon',
@@ -101,15 +110,18 @@ export const AGENT_ORDER: readonly AgentName[] = Object.freeze([
 ] as const);
 
 // Parallel execution groups
+// 并行 execution groups。
 export const getParallelGroups = (): Readonly<{ vuln: AgentName[]; exploit: AgentName[] }> => Object.freeze({
   vuln: ['injection-vuln', 'xss-vuln', 'auth-vuln', 'ssrf-vuln', 'authz-vuln'],
   exploit: ['injection-exploit', 'xss-exploit', 'auth-exploit', 'ssrf-exploit', 'authz-exploit']
 });
 
 // Phase names for metrics aggregation
+// 阶段 names for metrics aggregation。
 export type PhaseName = 'pre-recon' | 'recon' | 'vulnerability-analysis' | 'exploitation' | 'reporting';
 
 // Map agents to their corresponding phases (single source of truth)
+// Map agents to their corresponding phases (single source of truth)。
 export const AGENT_PHASE_MAP: Readonly<Record<AgentName, PhaseName>> = Object.freeze({
   'pre-recon': 'pre-recon',
   'recon': 'recon',

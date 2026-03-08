@@ -25,6 +25,15 @@
       "transformer": {
         "use": ["openrouter"]
       }
+    },
+    {
+      "name": "minimax",
+      "api_base_url": "https://api.minimaxi.com/v1/chat/completions",
+      "api_key": "$MINIMAX_API_KEY",
+      "models": ["MiniMax-M2.5"],
+      "transformer": {
+        "use": []
+      }
     }
   ],
   "Router": {

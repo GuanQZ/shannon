@@ -5,13 +5,22 @@
 // as published by the Free Software Foundation.
 
 /**
+ * 文件说明：
+ * 提供时间、时长、文本等格式化函数，统一日志与报告中的展示风格。
+ * 该文件用于提升输出一致性与可读性。
+ */
+
+/**
  * Formatting Utilities
+ * Formatting Utilities。
  *
  * Generic formatting functions for durations, timestamps, and percentages.
+ * Generic formatting 函数 for durations, timestamps, and percentages.。
  */
 
 /**
  * Format duration in milliseconds to human-readable string
+ * 格式 耗时 in milliseconds to human-readable string。
  */
 export function formatDuration(ms: number): string {
   if (ms < 1000) {
@@ -30,6 +39,7 @@ export function formatDuration(ms: number): string {
 
 /**
  * Format timestamp to ISO 8601 string
+ * 格式 timestamp to ISO 8601 string。
  */
 export function formatTimestamp(timestamp: number = Date.now()): string {
   return new Date(timestamp).toISOString();
@@ -37,6 +47,7 @@ export function formatTimestamp(timestamp: number = Date.now()): string {
 
 /**
  * Calculate percentage
+ * Calculate percentage。
  */
 export function calculatePercentage(part: number, total: number): number {
   if (total === 0) return 0;
@@ -45,6 +56,7 @@ export function calculatePercentage(part: number, total: number): number {
 
 /**
  * Extract agent type from description string for display purposes
+ * Extract 代理 类型 来自 description string for display purposes。
  */
 export function extractAgentType(description: string): string {
   if (description.includes('Pre-recon')) {

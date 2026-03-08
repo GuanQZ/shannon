@@ -5,7 +5,14 @@
 // as published by the Free Software Foundation.
 
 /**
+ * 文件说明：
+ * 定义系统配置结构类型（目标、认证、规则、分布式参数等），与配置解析模块配套使用。
+ * 该文件保障配置输入在编译期具备可验证性与可演进性。
+ */
+
+/**
  * Configuration type definitions
+ * 配置 类型 definitions。
  */
 
 export type RuleType =

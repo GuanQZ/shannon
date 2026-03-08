@@ -5,10 +5,19 @@
 // as published by the Free Software Foundation.
 
 /**
+ * 文件说明：
+ * 记录工作流级别的关键状态变化（阶段切换、失败点、汇总信息），补充代理级日志。
+ * 该文件用于从全局视角观察一次完整渗透任务的生命周期。
+ */
+
+/**
  * Workflow Logger
+ * 工作流 日志器。
  *
  * Provides a unified, human-readable log file per workflow.
+ * Provides a unified, human-readable log 文件 per 工作流.。
  * Optimized for `tail -f` viewing during concurrent workflow execution.
+ * Optimized for `tail -f` viewing during concurrent 工作流 execution.。
  */
 
 import fs from 'fs';
@@ -40,6 +49,7 @@ export interface WorkflowSummary {
 
 /**
  * WorkflowLogger - Manages the unified workflow log file
+ * WorkflowLogger - Manages the unified 工作流 log 文件。
  */
 export class WorkflowLogger {
   private sessionMetadata: SessionMetadata;
@@ -54,6 +64,7 @@ export class WorkflowLogger {
 
   /**
    * Initialize the log stream (creates file and writes header)
+   * Initialize the log stream (creates 文件 and writes header)。
    */
   async initialize(): Promise<void> {
     if (this.initialized) {
@@ -61,9 +72,11 @@ export class WorkflowLogger {
     }
 
     // Ensure directory exists
+    // 确保 directory exists。
     await ensureDirectory(path.dirname(this.logPath));
 
     // Create write stream with append mode
+    // 创建 写入 stream with append 模式。
     this.stream = fs.createWriteStream(this.logPath, {
       flags: 'a',
       encoding: 'utf8',
@@ -73,6 +86,7 @@ export class WorkflowLogger {
     this.initialized = true;
 
     // Write header only if file is new (empty)
+    // 写入 header 仅 如果 文件 is new (empty)。
     const stats = await fs.promises.stat(this.logPath).catch(() => null);
     if (!stats || stats.size === 0) {
       await this.writeHeader();
@@ -81,6 +95,7 @@ export class WorkflowLogger {
 
   /**
    * Write header to log file
+   * 写入 header to log 文件。
    */
   private async writeHeader(): Promise<void> {
     const header = [
@@ -99,6 +114,7 @@ export class WorkflowLogger {
 
   /**
    * Write raw text to log file with immediate flush
+   * 写入 raw text to log 文件 with immediate flush。
    */
   private writeRaw(text: string): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -121,6 +137,7 @@ export class WorkflowLogger {
 
   /**
    * Format timestamp for log line (local time, human readable)
+   * 格式 timestamp for log line (本地 time, human readable)。
    */
   private formatLogTime(): string {
     const now = new Date();
@@ -129,6 +146,7 @@ export class WorkflowLogger {
 
   /**
    * Log a phase transition event
+   * Log a 阶段 transition event。
    */
   async logPhase(phase: string, event: 'start' | 'complete'): Promise<void> {
     await this.ensureInitialized();
@@ -137,6 +155,7 @@ export class WorkflowLogger {
     const line = `[${this.formatLogTime()}] [PHASE] ${action}: ${phase}\n`;
 
     // Add blank line before phase start for readability
+    // Add blank line before 阶段 start for readability。
     if (event === 'start') {
       await this.writeRaw('\n');
     }
@@ -146,6 +165,7 @@ export class WorkflowLogger {
 
   /**
    * Log an agent event
+   * Log an 代理 event。
    */
   async logAgent(
     agentName: string,
@@ -189,6 +209,7 @@ export class WorkflowLogger {
 
   /**
    * Log a general event
+   * Log a general event。
    */
   async logEvent(eventType: string, message: string): Promise<void> {
     await this.ensureInitialized();
@@ -199,6 +220,7 @@ export class WorkflowLogger {
 
   /**
    * Log an error
+   * Log an 错误。
    */
   async logError(error: Error, context?: string): Promise<void> {
     await this.ensureInitialized();
@@ -210,6 +232,7 @@ export class WorkflowLogger {
 
   /**
    * Truncate string to max length with ellipsis
+   * Truncate string to max length with ellipsis。
    */
   private truncate(str: string, maxLen: number): string {
     if (str.length <= maxLen) return str;
@@ -218,6 +241,7 @@ export class WorkflowLogger {
 
   /**
    * Format tool parameters for human-readable display
+   * 格式 工具 parameters for human-readable display。
    */
   private formatToolParams(toolName: string, params: unknown): string {
     if (!params || typeof params !== 'object') {
@@ -227,6 +251,7 @@ export class WorkflowLogger {
     const p = params as Record<string, unknown>;
 
     // Tool-specific formatting for common tools
+    // 工具-specific formatting for common 工具。
     switch (toolName) {
       case 'Bash':
         if (p.command) {
@@ -283,6 +308,7 @@ export class WorkflowLogger {
     }
 
     // Default: show first string-valued param truncated
+    // 默认: show first string-valued param truncated。
     for (const [key, val] of Object.entries(p)) {
       if (typeof val === 'string' && val.length > 0) {
         return `${key}=${this.truncate(val, 60)}`;
@@ -294,6 +320,7 @@ export class WorkflowLogger {
 
   /**
    * Log tool start event
+   * Log 工具 start event。
    */
   async logToolStart(agentName: string, toolName: string, parameters: unknown): Promise<void> {
     await this.ensureInitialized();
@@ -306,11 +333,13 @@ export class WorkflowLogger {
 
   /**
    * Log LLM response
+   * Log LLM response。
    */
   async logLlmResponse(agentName: string, turn: number, content: string): Promise<void> {
     await this.ensureInitialized();
 
     // Show full content, replacing newlines with escaped version for single-line output
+    // Show full 内容, replacing newlines with escaped version for single-line output。
     const escaped = content.replace(/\n/g, '\\n');
     const line = `[${this.formatLogTime()}] [${agentName}] [LLM] Turn ${turn}: ${escaped}\n`;
     await this.writeRaw(line);
@@ -318,6 +347,7 @@ export class WorkflowLogger {
 
   /**
    * Log workflow completion with full summary
+   * Log 工作流 completion with full summary。
    */
   async logWorkflowComplete(summary: WorkflowSummary): Promise<void> {
     await this.ensureInitialized();
@@ -357,6 +387,7 @@ export class WorkflowLogger {
 
   /**
    * Ensure initialized (helper for lazy initialization)
+   * 确保 initialized (辅助 for lazy initialization)。
    */
   private async ensureInitialized(): Promise<void> {
     if (!this.initialized) {
@@ -366,6 +397,7 @@ export class WorkflowLogger {
 
   /**
    * Close the log stream
+   * Close the log stream。
    */
   async close(): Promise<void> {
     if (!this.initialized || !this.stream) {

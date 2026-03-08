@@ -4,12 +4,19 @@
 // it under the terms of the GNU Affero General Public License version 3
 // as published by the Free Software Foundation.
 
+/**
+ * 文件说明：
+ * 定义系统级常量与默认值，包括模型调用、重试策略、代理映射、目录约定等基础参数。
+ * 该文件用于消除魔法值，保证不同阶段与模块在配置上的一致性与可维护性。
+ */
+
 import { path, fs } from 'zx';
 import chalk from 'chalk';
 import { validateQueueAndDeliverable, type VulnType } from './queue-validation.js';
 import type { AgentName, PromptName, PlaywrightAgent, AgentValidator } from './types/agents.js';
 
 // Factory function for vulnerability queue validators
+// Factory 函数 for 漏洞 队列 validators。
 function createVulnValidator(vulnType: VulnType): AgentValidator {
   return async (sourceDir: string): Promise<boolean> => {
     try {
@@ -24,6 +31,7 @@ function createVulnValidator(vulnType: VulnType): AgentValidator {
 }
 
 // Factory function for exploit deliverable validators
+// Factory 函数 for exploit 交付物 validators。
 function createExploitValidator(vulnType: VulnType): AgentValidator {
   return async (sourceDir: string): Promise<boolean> => {
     const evidenceFile = path.join(sourceDir, 'deliverables', `${vulnType}_exploitation_evidence.md`);
@@ -32,16 +40,22 @@ function createExploitValidator(vulnType: VulnType): AgentValidator {
 }
 
 // MCP agent mapping - assigns each agent to a specific Playwright instance to prevent conflicts
+// MCP 代理 mapping - assigns 每个 代理 to a specific Playwright instance to 防止 conflicts。
 export const MCP_AGENT_MAPPING: Record<PromptName, PlaywrightAgent> = Object.freeze({
   // Phase 1: Pre-reconnaissance (actual prompt name is 'pre-recon-code')
+  // 阶段 1: Pre-reconnaissance (actual prompt name is 'pre-侦察-code')。
   // NOTE: Pre-recon is pure code analysis and doesn't use browser automation,
+  // NOTE: Pre-侦察 is pure code analysis and doesn't 使用 browser automation,。
   // but assigning MCP server anyway for consistency and future extensibility
+  // but assigning MCP 服务 anyway for consistency and future extensibility。
   'pre-recon-code': 'playwright-agent1',
 
   // Phase 2: Reconnaissance (actual prompt name is 'recon')
+  // 阶段 2: Reconnaissance (actual prompt name is '侦察')。
   recon: 'playwright-agent2',
 
   // Phase 3: Vulnerability Analysis (5 parallel agents)
+  // 阶段 3: 漏洞 Analysis (5 并行 agents)。
   'vuln-injection': 'playwright-agent1',
   'vuln-xss': 'playwright-agent2',
   'vuln-auth': 'playwright-agent3',
@@ -49,6 +63,7 @@ export const MCP_AGENT_MAPPING: Record<PromptName, PlaywrightAgent> = Object.fre
   'vuln-authz': 'playwright-agent5',
 
   // Phase 4: Exploitation (5 parallel agents - same as vuln counterparts)
+  // 阶段 4: 利用 (5 并行 agents - same as vuln counterparts)。
   'exploit-injection': 'playwright-agent1',
   'exploit-xss': 'playwright-agent2',
   'exploit-auth': 'playwright-agent3',
@@ -56,26 +71,33 @@ export const MCP_AGENT_MAPPING: Record<PromptName, PlaywrightAgent> = Object.fre
   'exploit-authz': 'playwright-agent5',
 
   // Phase 5: Reporting (actual prompt name is 'report-executive')
+  // 阶段 5: Reporting (actual prompt name is '报告-executive')。
   // NOTE: Report generation is typically text-based and doesn't use browser automation,
+  // NOTE: 报告 generation is typically text-基于 and doesn't 使用 browser automation,。
   // but assigning MCP server anyway for potential screenshot inclusion or future needs
+  // but assigning MCP 服务 anyway for potential screenshot inclusion or future needs。
   'report-executive': 'playwright-agent3',
 });
 
 // Direct agent-to-validator mapping - much simpler than pattern matching
+// Direct 代理-to-validator mapping - much simpler than 模式 matching。
 export const AGENT_VALIDATORS: Record<AgentName, AgentValidator> = Object.freeze({
   // Pre-reconnaissance agent - validates the code analysis deliverable created by the agent
+  // Pre-reconnaissance 代理 - validates the code analysis 交付物 created by the 代理。
   'pre-recon': async (sourceDir: string): Promise<boolean> => {
     const codeAnalysisFile = path.join(sourceDir, 'deliverables', 'code_analysis_deliverable.md');
     return await fs.pathExists(codeAnalysisFile);
   },
 
   // Reconnaissance agent
+  // Reconnaissance 代理。
   recon: async (sourceDir: string): Promise<boolean> => {
     const reconFile = path.join(sourceDir, 'deliverables', 'recon_deliverable.md');
     return await fs.pathExists(reconFile);
   },
 
   // Vulnerability analysis agents
+  // 漏洞 analysis agents。
   'injection-vuln': createVulnValidator('injection'),
   'xss-vuln': createVulnValidator('xss'),
   'auth-vuln': createVulnValidator('auth'),
@@ -83,6 +105,7 @@ export const AGENT_VALIDATORS: Record<AgentName, AgentValidator> = Object.freeze
   'authz-vuln': createVulnValidator('authz'),
 
   // Exploitation agents
+  // 利用 agents。
   'injection-exploit': createExploitValidator('injection'),
   'xss-exploit': createExploitValidator('xss'),
   'auth-exploit': createExploitValidator('auth'),
@@ -90,6 +113,7 @@ export const AGENT_VALIDATORS: Record<AgentName, AgentValidator> = Object.freeze
   'authz-exploit': createExploitValidator('authz'),
 
   // Executive report agent
+  // Executive 报告 代理。
   report: async (sourceDir: string): Promise<boolean> => {
     const reportFile = path.join(
       sourceDir,

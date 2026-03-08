@@ -160,12 +160,32 @@ open http://localhost:8233
 # Basic pentest
 ./shannon start URL=https://example.com REPO=repo-name
 
+# Scan directly from git URL (auto clone to isolated workspace)
+./shannon start URL=https://example.com REPO=https://github.com/your-org/repo.git
+
 # With a configuration file
 ./shannon start URL=https://example.com REPO=repo-name CONFIG=./configs/my-config.yaml
 
 # Custom output directory
 ./shannon start URL=https://example.com REPO=repo-name OUTPUT=./my-reports
+
+# Safe mode in K8s (default true)
+./shannon start URL=https://example.com REPO=repo-name SAFE_MODE=true
+
+# Allow local git checkpoint/rollback/commit (default is disabled in safe mode)
+./shannon start URL=https://example.com REPO=repo-name SAFE_MODE=false SHANNON_DISABLE_GIT_WRITES=false
 ```
+
+### Safe Mode for External Repository Scans
+
+When scanning code provided by others, Shannon supports a safer execution mode:
+
+- `SAFE_MODE=true` (default) enables safer defaults.
+- `REPO=<git-url>` clones into an isolated workspace under `./repos/_jobs/`.
+- In safe mode, git push URLs are disabled in the scanned workspace.
+- `SHANNON_DISABLE_GIT_WRITES=true` disables local git checkpoint/rollback/commit during execution.
+
+This mode helps avoid accidental changes to shared workspaces and prevents any push to remote repositories.
 
 ### Prepare Your Repository
 

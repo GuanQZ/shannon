@@ -43,8 +43,11 @@ Usage:
 
 Options for 'start':
   REPO=<name>            Folder name under ./repos/ (e.g. REPO=repo-name)
+  REPO=<git-url>         Git repository URL (will be cloned to isolated ./repos/_jobs/)
   CONFIG=<path>          Configuration file (YAML)
   OUTPUT=<path>          Output directory for reports (default: ./audit-logs/)
+  SAFE_MODE=true|false   Default true. Enables safe defaults for external scans
+  SHANNON_DISABLE_GIT_WRITES=true|false  Disable local git checkpoint/rollback/commit
   PIPELINE_TESTING=true  Use minimal prompts for fast testing
   ROUTER=true            Route requests through claude-code-router (multi-model support)
 
@@ -74,10 +77,19 @@ parse_args() {
       ID=*) ID="${arg#ID=}" ;;
       CLEAN=*) CLEAN="${arg#CLEAN=}" ;;
       PIPELINE_TESTING=*) PIPELINE_TESTING="${arg#PIPELINE_TESTING=}" ;;
+      SAFE_MODE=*) SAFE_MODE="${arg#SAFE_MODE=}" ;;
+      SHANNON_DISABLE_GIT_WRITES=*) SHANNON_DISABLE_GIT_WRITES="${arg#SHANNON_DISABLE_GIT_WRITES=}" ;;
       REBUILD=*) REBUILD="${arg#REBUILD=}" ;;
       ROUTER=*) ROUTER="${arg#ROUTER=}" ;;
     esac
   done
+}
+
+is_git_url() {
+  case "$1" in
+    http://*|https://*|ssh://*|git@*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 # Check if Temporal is running and healthy
@@ -127,6 +139,13 @@ ensure_containers() {
 cmd_start() {
   parse_args "$@"
 
+  # Safe mode defaults for scanning external repositories
+  SAFE_MODE="${SAFE_MODE:-true}"
+  if [ "$SAFE_MODE" = "true" ] && [ -z "$SHANNON_DISABLE_GIT_WRITES" ]; then
+    SHANNON_DISABLE_GIT_WRITES="true"
+  fi
+  export SHANNON_DISABLE_GIT_WRITES
+
   # Validate required vars
   if [ -z "$URL" ] || [ -z "$REPO" ]; then
     echo "ERROR: URL and REPO are required"
@@ -149,7 +168,24 @@ cmd_start() {
   # Determine container path for REPO
   # - If REPO is already a container path (/benchmarks/*, /repos/*), use as-is
   # - Otherwise, treat as a folder name under ./repos/ (mounted at /repos in container)
-  case "$REPO" in
+  if is_git_url "$REPO"; then
+    mkdir -p ./repos/_jobs
+    JOB_ID="$(date +%Y%m%d-%H%M%S)-$RANDOM"
+    CLONE_DIR="./repos/_jobs/$JOB_ID"
+
+    echo "Cloning repository into isolated workspace: $CLONE_DIR"
+    git clone --depth 1 "$REPO" "$CLONE_DIR"
+
+    if [ "$SAFE_MODE" = "true" ] && [ -d "$CLONE_DIR/.git" ]; then
+      for remote in $(git -C "$CLONE_DIR" remote 2>/dev/null); do
+        git -C "$CLONE_DIR" remote set-url --push "$remote" DISABLED >/dev/null 2>&1 || true
+      done
+      echo "Safe mode: git push URL disabled for isolated workspace"
+    fi
+
+    CONTAINER_REPO="/repos/_jobs/$JOB_ID"
+  else
+    case "$REPO" in
     /benchmarks/*|/repos/*)
       CONTAINER_REPO="$REPO"
       ;;
@@ -162,7 +198,19 @@ cmd_start() {
       fi
       CONTAINER_REPO="/repos/$REPO"
       ;;
-  esac
+    esac
+
+    if [ "$SAFE_MODE" = "true" ] && [ -d "./repos/$REPO/.git" ]; then
+      for remote in $(git -C "./repos/$REPO" remote 2>/dev/null); do
+        git -C "./repos/$REPO" remote set-url --push "$remote" DISABLED >/dev/null 2>&1 || true
+      done
+      echo "Safe mode: git push URL disabled for local workspace"
+    fi
+  fi
+
+  if [ "$SHANNON_DISABLE_GIT_WRITES" = "true" ]; then
+    echo "Safe mode: local git checkpoint/rollback/commit is disabled"
+  fi
 
   # Handle custom OUTPUT directory
   # Export OUTPUT_DIR for docker-compose volume mount BEFORE starting containers

@@ -1,0 +1,23 @@
+# Juice Shop Configuration
+# 轻量级渗透测试靶场
+
+authentication:
+  login_type: form
+  login_url: "http://host.docker.internal:3000/#/login"
+  credentials:
+    username: "admin@juice-sh.op"
+    password: "admin123"
+
+  # Natural language instructions for login flow
+  login_flow:
+    - "Navigate to the login page"
+    - "Type $username into the email field"
+    - "Type $password into the password field"
+    - "Click the 'Login' button"
+
+  success_condition:
+    type: url_contains
+    value: "/dashboard"
+
+# OWASP Juice Shop default credentials
+# admin@juice-sh.op / admin123

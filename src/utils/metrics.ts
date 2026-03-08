@@ -4,10 +4,17 @@
 // it under the terms of the GNU Affero General Public License version 3
 // as published by the Free Software Foundation.
 
+/**
+ * 文件说明：
+ * 提供计时与指标统计工具，用于采集阶段/代理执行耗时和运行数据。
+ * 该文件支撑性能分析、进度展示与报告指标输出。
+ */
+
 import chalk from 'chalk';
 import { formatDuration } from './formatting.js';
 
 // Timing utilities
+// Timing utilities。
 
 export class Timer {
   name: string;
@@ -49,6 +56,7 @@ interface CostResults {
 }
 
 // Global timing and cost tracker
+// Global timing and 成本 tracker。
 export const timingResults: TimingResults = {
   total: null,
   agents: {},
@@ -60,6 +68,7 @@ export const costResults: CostResults = {
 };
 
 // Function to display comprehensive timing summary
+// 函数 to display comprehensive timing summary。
 export const displayTimingSummary = (): void => {
   if (!timingResults.total) {
     console.log(chalk.yellow('No timing data available'));
@@ -72,10 +81,12 @@ export const displayTimingSummary = (): void => {
   console.log(chalk.gray('─'.repeat(60)));
 
   // Total execution time
+  // Total execution time。
   console.log(chalk.cyan(`📊 Total Execution Time: ${formatDuration(totalDuration)}`));
   console.log();
 
   // Agent breakdown
+  // 代理 breakdown。
   if (Object.keys(timingResults.agents).length > 0) {
     console.log(chalk.magenta.bold('🤖 Agent Breakdown:'));
     let agentTotal = 0;
@@ -97,6 +108,7 @@ export const displayTimingSummary = (): void => {
   }
 
   // Cost breakdown
+  // 成本 breakdown。
   if (Object.keys(costResults.agents).length > 0) {
     console.log(chalk.green.bold('\n💰 Cost Breakdown:'));
     for (const [agent, cost] of Object.entries(costResults.agents)) {

@@ -4,6 +4,12 @@
 // it under the terms of the GNU Affero General Public License version 3
 // as published by the Free Software Foundation.
 
+/**
+ * 文件说明：
+ * 提供命令行进度展示能力，负责将多阶段、多代理执行状态以可视化文本形式实时输出。
+ * 该文件提升了长时间渗透任务的人机可观测性，便于用户跟踪当前阶段、耗时与异常。
+ */
+
 import chalk from 'chalk';
 
 export class ProgressIndicator {
@@ -25,6 +31,7 @@ export class ProgressIndicator {
 
     this.interval = setInterval(() => {
       // Clear the line and write the spinner
+      // Clear the line and 写入 the spinner。
       process.stdout.write(
         `\r${chalk.cyan(this.frames[this.frameIndex])} ${chalk.dim(this.message)}`
       );
@@ -41,6 +48,7 @@ export class ProgressIndicator {
     }
 
     // Clear the spinner line
+    // Clear the spinner line。
     process.stdout.write('\r' + ' '.repeat(this.message.length + 5) + '\r');
     this.isRunning = false;
   }

@@ -5,7 +5,14 @@
 // as published by the Free Software Foundation.
 
 /**
+ * 文件说明：
+ * 定义错误上下文、错误分类与错误结果载荷类型，支撑统一错误处理链路。
+ * 该文件用于约束错误信息结构，提升诊断一致性。
+ */
+
+/**
  * Error type definitions
+ * 错误 类型 definitions。
  */
 
 export type PentestErrorType =

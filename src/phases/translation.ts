@@ -14,6 +14,7 @@
 import { fs, path } from 'zx';
 import chalk from 'chalk';
 import markdownpdf from 'markdown-pdf';
+import { mdToPdf } from 'md-to-pdf';
 import { PentestError } from '../error-handling.js';
 
 /**
@@ -68,6 +69,32 @@ function getBaseUrl(config: TranslationConfig): string {
 }
 
 /**
+ * Fix image paths in translated markdown
+ * Chinese reports are in deliverables/chinese/{stage}/ so need ../../ to reach repo root
+ *
+ * @param content - Markdown content
+ * @param targetDir - Target directory path relative to deliverables
+ * @returns Content with fixed image paths
+ */
+function fixImagePaths(content: string, targetDir: string): string {
+  // Determine depth from deliverables/chinese/{stage}/ to repo root
+  // All Chinese reports are under deliverables/chinese/, so we need to go up 3 levels
+  // to reach the repo root where screenshots are stored
+  // Path: deliverables/chinese/reporting/ -> ../../../ -> project root
+
+  const depthToRoot = '../../../';
+
+  // Match markdown image syntax: ![alt](path.png)
+  // Handle both ./xxx.png and ../xxx.png relative paths
+  const imageRegex = /!\[([^\]]*)\]\(\.\.?\/([^)]+\.png)\)/g;
+
+  return content.replace(imageRegex, (match, alt, imagePath) => {
+    // Convert relative paths to ../../../image.png for Chinese reports
+    return `![${alt}](${depthToRoot}${imagePath})`;
+  });
+}
+
+/**
  * Determine stage folder from filename
  * 根据文件名确定阶段文件夹
  */
@@ -90,17 +117,137 @@ async function convertMarkdownToPdf(
   markdownPath: string,
   outputPath: string
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    (markdownpdf() as any)
-      .from(markdownPath)
-      .to(outputPath, (err: Error | null) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
+  try {
+    // Get the directory of the markdown file for resolving relative image paths
+    const markdownDir = path.dirname(markdownPath);
+
+    // Custom CSS for better PDF styling - Typora/GitHub style
+    const customCss = `
+      :root {
+        --bg-color: #ffffff;
+        --text-color: #24292e;
+        --heading-color: #111111;
+        --link-color: #0366d6;
+        --code-bg: #f6f8fa;
+        --border-color: #e1e4e8;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans CJK SC', 'Noto Sans SC', 'Helvetica Neue', Arial, sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+        color: var(--text-color);
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 40px;
+      }
+      h1, h2, h3, h4, h5, h6 {
+        font-weight: 600;
+        line-height: 1.25;
+        margin-top: 24px;
+        margin-bottom: 16px;
+        color: var(--heading-color);
+      }
+      h1 {
+        font-size: 2em;
+        padding-bottom: 0.3em;
+        border-bottom: 1px solid var(--border-color);
+      }
+      h2 {
+        font-size: 1.5em;
+        padding-bottom: 0.3em;
+        border-bottom: 1px solid var(--border-color);
+      }
+      h3 { font-size: 1.25em; }
+      h4 { font-size: 1em; }
+      p { margin-top: 0; margin-bottom: 16px; }
+      a { color: var(--link-color); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      code {
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        font-size: 85%;
+        background-color: var(--code-bg);
+        padding: 0.2em 0.4em;
+        border-radius: 3px;
+      }
+      pre {
+        padding: 16px;
+        overflow: auto;
+        font-size: 85%;
+        line-height: 1.45;
+        background-color: var(--code-bg);
+        border-radius: 6px;
+        margin-bottom: 16px;
+      }
+      pre code {
+        display: block;
+        padding: 0;
+        background: none;
+        font-size: 100%;
+      }
+      blockquote {
+        padding: 0 1em;
+        color: #6a737d;
+        border-left: 0.25em solid #dfe2e5;
+        margin: 0 0 16px 0;
+      }
+      ul, ol {
+        padding-left: 2em;
+        margin-top: 0;
+        margin-bottom: 16px;
+      }
+      li + li { margin-top: 0.25em; }
+      table {
+        display: table;
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 16px;
+      }
+      table th, table td {
+        padding: 6px 13px;
+        border: 1px solid #dfe2e5;
+      }
+      table th {
+        font-weight: 600;
+        background-color: #f6f8fa;
+      }
+      table tr:nth-child(2n) { background-color: #f6f8fa; }
+      img {
+        max-width: 100%;
+        box-sizing: content-box;
+        border-radius: 3px;
+        margin: 10px 0;
+      }
+      hr {
+        height: 0.25em;
+        padding: 0;
+        margin: 24px 0;
+        background-color: #e1e4e8;
+        border: 0;
+      }
+    `;
+
+    await mdToPdf(
+      { path: markdownPath },
+      {
+        dest: outputPath,
+        css: customCss,
+        // Use system chromium in container
+        launch_options: {
+          executablePath: process.env.PDF_EXECUTABLE_PATH || '/usr/bin/chromium',
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu'
+          ] as any
         }
-      });
-  });
+      }
+    ).catch((err) => {
+      throw err;
+    });
+  } catch (error) {
+    throw error;
+  }
 }
 
 /**
@@ -110,10 +257,10 @@ async function convertMarkdownToPdf(
 async function translateText(
   config: TranslationConfig,
   text: string,
-  model: string = 'minimax-m2.5'
+  model?: string
 ): Promise<string> {
-  // Use the model from config, fallback to minimax-m2.5
-  const modelToUse = model || 'minimax-m2.5';
+  // Use the model from parameter, then config, then environment, then fallback
+  const modelToUse = model || config.model || 'minimax-m2.5';
   const baseUrl = getBaseUrl(config);
 
   const translationPrompt = `You are a professional technical translator. Translate the following English penetration testing report to Simplified Chinese.
@@ -130,23 +277,30 @@ Translate now:
 ${text}`;
 
   // Use shorter max_tokens and simpler prompt like audit logger
-  const response = await fetch(`${baseUrl}/v1/messages`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': config.apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: modelToUse,
-      max_tokens: 32768,
-      system: 'You are a translator. Translate the text to Simplified Chinese ONLY. Output ONLY the translation, no original text, no explanations. Keep technical terms (CVEs, payloads, endpoints, HTTP methods, file paths, code) in English. Do not include any prefix like [agent] or labels.',
-      messages: [{ role: 'user', content: text }]
-    })
-  });
+  let response;
+  try {
+    response = await fetch(`${baseUrl}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: modelToUse,
+        max_tokens: 8192,
+        system: 'You are a translator. Translate the text to Simplified Chinese ONLY. Output ONLY the translation, no original text, no explanations. Keep technical terms (CVEs, payloads, endpoints, HTTP methods, file paths, code) in English. Do not include any prefix like [agent] or labels.',
+        messages: [{ role: 'user', content: text }]
+      })
+    });
+  } catch (fetchError) {
+    console.error('Fetch error details:', fetchError);
+    throw fetchError;
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
+    console.error('Translation API error:', response.status, errorText);
     throw new Error(`Translation API error: ${response.status} ${errorText}`);
   }
 
@@ -227,11 +381,15 @@ export async function translateReports(
         // Translate content
         const translated = await translateText(config, content, config.model);
 
+        // Fix image paths: Chinese reports are in deliverables/chinese/{stage}/
+        // so need ../../ to reach repo root where screenshots are stored
+        const fixedContent = fixImagePaths(translated, targetDir);
+
         // Ensure target directory exists
         await fs.ensureDir(targetDir);
 
         // Write translated file
-        await fs.writeFile(targetPath, translated);
+        await fs.writeFile(targetPath, fixedContent);
 
         console.log(chalk.green(`✅ Translated: ${filename} → chinese/${stage}/`));
         translatedFiles.push(`chinese/${stage}/${filename}`);
@@ -285,10 +443,39 @@ export async function translateReports(
       let pdfSuccess = 0;
       let pdfFailed = 0;
 
+      // Copy images to markdown directory before PDF generation
+      // Puppeteer can't resolve ../../../ paths correctly, so we copy images to same directory
+      const copyImagesForPdf = async (mdPath: string): Promise<void> => {
+        const mdDir = path.dirname(mdPath);
+        const content = await fs.readFile(mdPath, 'utf8');
+
+        // Find all image references with ../ paths
+        const imageRegex = /!\[([^\]]*)\]\(([^)]+\.png)\)/g;
+        let match;
+        const imagesCopied = new Set<string>();
+
+        while ((match = imageRegex.exec(content)) !== null) {
+          const imagePath = match[2];
+          if (imagePath && imagePath.startsWith('../') && !imagesCopied.has(imagePath)) {
+            imagesCopied.add(imagePath);
+            const absImagePath = path.resolve(mdDir, imagePath);
+            const imageFileName = path.basename(absImagePath);
+            const targetPath = path.join(mdDir, imageFileName);
+
+            if (await fs.pathExists(absImagePath) && !(await fs.pathExists(targetPath))) {
+              await fs.copyFile(absImagePath, targetPath);
+              console.log(chalk.gray(`  📷 Copied image for PDF: ${imageFileName}`));
+            }
+          }
+        }
+      };
+
       for (const mdPath of mdFiles) {
         const pdfPath = mdPath.replace('.md', '.pdf');
 
         try {
+          // Copy images before converting to PDF
+          await copyImagesForPdf(mdPath);
           await convertMarkdownToPdf(mdPath, pdfPath);
           console.log(chalk.green(`✅ PDF generated: ${path.basename(pdfPath)}`));
           pdfSuccess++;

@@ -4,6 +4,12 @@
 // it under the terms of the GNU Affero General Public License version 3
 // as published by the Free Software Foundation.
 
+/**
+ * 文件说明：
+ * 实现预侦察阶段业务：执行基础外部扫描、代码预分析并沉淀后续阶段所需上下文。
+ * 该文件是整个渗透流水线的第一阶段产物来源。
+ */
+
 import { $, fs, path } from 'zx';
 import chalk from 'chalk';
 import { Timer } from '../utils/metrics.js';
@@ -41,6 +47,7 @@ interface PromptVariables {
 }
 
 // Discriminated union for Wave1 tool results - clearer than loose union types
+// 使用可区分联合类型，确保调用侧按 kind 分支处理结果，避免宽泛联合导致的字段误用。
 type Wave1ToolResult =
   | { kind: 'scan'; result: TerminalScanResult }
   | { kind: 'skipped'; message: string }
@@ -64,47 +71,54 @@ interface PreReconResult {
 }
 
 // Runs external security tools (nmap, whatweb, etc). Schemathesis requires schemas from code analysis.
+// 统一执行外部扫描工具并标准化返回结构。
+// - tool: 扫描器名称，便于后续拼接报告。
+// - output: 原始输出文本，尽量保留证据细节。
+// - status: success/skipped/error，用于流程决策与可视化。
+// - duration: 单工具耗时（毫秒）。
 async function runTerminalScan(tool: ToolName, target: string, sourceDir: string | null = null): Promise<TerminalScanResult> {
   const timer = new Timer(`command-${tool}`);
   try {
     let result;
     switch (tool) {
       case 'nmap': {
-        console.log(chalk.blue(`    🔍 Running ${tool} scan...`));
+        console.log(chalk.blue(`    🔍 正在执行 ${tool} 扫描...`));
         const nmapHostname = new URL(target).hostname;
         result = await $({ silent: true, stdio: ['ignore', 'pipe', 'ignore'] })`nmap -sV -sC ${nmapHostname}`;
         const duration = timer.stop();
-        console.log(chalk.green(`    ✅ ${tool} completed in ${formatDuration(duration)}`));
+        console.log(chalk.green(`    ✅ ${tool} 扫描完成，耗时 ${formatDuration(duration)}`));
         return { tool: 'nmap', output: result.stdout, status: 'success', duration };
       }
       case 'subfinder': {
-        console.log(chalk.blue(`    🔍 Running ${tool} scan...`));
+        console.log(chalk.blue(`    🔍 正在执行 ${tool} 扫描...`));
         const hostname = new URL(target).hostname;
         result = await $({ silent: true, stdio: ['ignore', 'pipe', 'ignore'] })`subfinder -d ${hostname}`;
         const subfinderDuration = timer.stop();
-        console.log(chalk.green(`    ✅ ${tool} completed in ${formatDuration(subfinderDuration)}`));
+        console.log(chalk.green(`    ✅ ${tool} 扫描完成，耗时 ${formatDuration(subfinderDuration)}`));
         return { tool: 'subfinder', output: result.stdout, status: 'success', duration: subfinderDuration };
       }
       case 'whatweb': {
-        console.log(chalk.blue(`    🔍 Running ${tool} scan...`));
+        console.log(chalk.blue(`    🔍 正在执行 ${tool} 扫描...`));
         const command = `whatweb --open-timeout 30 --read-timeout 60 ${target}`;
-        console.log(chalk.gray(`    Command: ${command}`));
+        console.log(chalk.gray(`    命令：${command}`));
         result = await $({ silent: true, stdio: ['ignore', 'pipe', 'ignore'] })`whatweb --open-timeout 30 --read-timeout 60 ${target}`;
         const whatwebDuration = timer.stop();
-        console.log(chalk.green(`    ✅ ${tool} completed in ${formatDuration(whatwebDuration)}`));
+        console.log(chalk.green(`    ✅ ${tool} 扫描完成，耗时 ${formatDuration(whatwebDuration)}`));
         return { tool: 'whatweb', output: result.stdout, status: 'success', duration: whatwebDuration };
       }
       case 'schemathesis': {
         // Schemathesis depends on code analysis output - skip if no schemas found
+        // 该工具依赖 OpenAPI/Schema 文件；若前序未产出 schema，则直接跳过而非报错中断。
         const schemasDir = path.join(sourceDir || '.', 'outputs', 'schemas');
         if (await fs.pathExists(schemasDir)) {
           const schemaFiles = await fs.readdir(schemasDir) as string[];
           const apiSchemas = schemaFiles.filter((f: string) => f.endsWith('.json') || f.endsWith('.yml') || f.endsWith('.yaml'));
           if (apiSchemas.length > 0) {
-            console.log(chalk.blue(`    🔍 Running ${tool} scan...`));
+            console.log(chalk.blue(`    🔍 正在执行 ${tool} 扫描...`));
             const allResults: string[] = [];
 
             // Run schemathesis on each schema file
+            // 逐个 schema 扫描，避免单个文件失败影响整体。
             for (const schemaFile of apiSchemas) {
               const schemaPath = path.join(schemasDir, schemaFile);
               try {
@@ -117,15 +131,15 @@ async function runTerminalScan(tool: ToolName, target: string, sourceDir: string
             }
 
             const schemaDuration = timer.stop();
-            console.log(chalk.green(`    ✅ ${tool} completed in ${formatDuration(schemaDuration)}`));
+            console.log(chalk.green(`    ✅ ${tool} 扫描完成，耗时 ${formatDuration(schemaDuration)}`));
             return { tool: 'schemathesis', output: allResults.join('\n\n'), status: 'success', duration: schemaDuration };
           } else {
-            console.log(chalk.gray(`    ⏭️ ${tool} - no API schemas found`));
-            return { tool: 'schemathesis', output: 'No API schemas found', status: 'skipped', duration: timer.stop() };
+            console.log(chalk.gray(`    ⏭️ ${tool} - 未发现 API schema 文件`));
+            return { tool: 'schemathesis', output: '未发现 API schema 文件', status: 'skipped', duration: timer.stop() };
           }
         } else {
-          console.log(chalk.gray(`    ⏭️ ${tool} - schemas directory not found`));
-          return { tool: 'schemathesis', output: 'Schemas directory not found', status: 'skipped', duration: timer.stop() };
+          console.log(chalk.gray(`    ⏭️ ${tool} - 未找到 schema 目录`));
+          return { tool: 'schemathesis', output: '未找到 schema 目录', status: 'skipped', duration: timer.stop() };
         }
       }
       default:
@@ -133,12 +147,13 @@ async function runTerminalScan(tool: ToolName, target: string, sourceDir: string
     }
   } catch (error) {
     const duration = timer.stop();
-    console.log(chalk.red(`    ❌ ${tool} failed in ${formatDuration(duration)}`));
+    console.log(chalk.red(`    ❌ ${tool} 扫描失败，耗时 ${formatDuration(duration)}`));
     return handleToolError(tool, error as Error & { code?: string }) as TerminalScanResult;
   }
 }
 
 // Wave 1: Initial footprinting + authentication
+// 第一波并行执行“外部探测 + 代码预分析”，快速构建目标基础画像。
 async function runPreReconWave1(
   webUrl: string,
   sourceDir: string,
@@ -148,15 +163,16 @@ async function runPreReconWave1(
   sessionId: string | null = null,
   outputPath: string | null = null
 ): Promise<Wave1Results> {
-  console.log(chalk.blue('    → Launching Wave 1 operations in parallel...'));
+  console.log(chalk.blue('    → 正在并行启动第一波任务...'));
 
   const operations: Promise<TerminalScanResult | AgentResult>[] = [];
 
   const skippedResult = (message: string): Wave1ToolResult => ({ kind: 'skipped', message });
 
   // Skip external commands in pipeline testing mode
+  // 流水线测试模式仅验证编排链路，不依赖外部扫描工具与网络可达性。
   if (pipelineTestingMode) {
-    console.log(chalk.gray('    ⏭️ Skipping external tools (pipeline testing mode)'));
+    console.log(chalk.gray('    ⏭️ 当前为流水线测试模式，已跳过外部工具'));
     operations.push(
       runClaudePromptWithRetry(
         await loadPrompt('pre-recon-code', variables, null, pipelineTestingMode),
@@ -171,9 +187,9 @@ async function runPreReconWave1(
     );
     const [codeAnalysis] = await Promise.all(operations);
     return {
-      nmap: skippedResult('Skipped (pipeline testing mode)'),
-      subfinder: skippedResult('Skipped (pipeline testing mode)'),
-      whatweb: skippedResult('Skipped (pipeline testing mode)'),
+      nmap: skippedResult('已跳过（流水线测试模式）'),
+      subfinder: skippedResult('已跳过（流水线测试模式）'),
+      whatweb: skippedResult('已跳过（流水线测试模式）'),
       codeAnalysis: codeAnalysis as AgentResult
     };
   } else {
@@ -195,7 +211,8 @@ async function runPreReconWave1(
   }
 
   // Check if authentication config is provided for login instructions injection
-  console.log(chalk.gray(`    → Config check: ${config ? 'present' : 'missing'}, Auth: ${config?.authentication ? 'present' : 'missing'}`));
+  // 记录配置状态，便于排查“为何未注入登录指令”问题。
+  console.log(chalk.gray(`    → 配置检查：配置${config ? '已提供' : '缺失'}，认证配置${config?.authentication ? '已提供' : '缺失'}`));
 
   const [nmap, subfinder, whatweb, codeAnalysis] = await Promise.all(operations);
 
@@ -208,83 +225,94 @@ async function runPreReconWave1(
 }
 
 // Wave 2: Additional scanning
+// 第二波补充扫描，依赖第一波产物与本机工具可用性。
 async function runPreReconWave2(
   webUrl: string,
   sourceDir: string,
   toolAvailability: ToolAvailability,
   pipelineTestingMode: boolean = false
 ): Promise<Wave2Results> {
-  console.log(chalk.blue('    → Running Wave 2 additional scans in parallel...'));
+  console.log(chalk.blue('    → 正在并行执行第二波补充扫描...'));
 
   // Skip external commands in pipeline testing mode
+  // 与 Wave1 保持一致，测试模式下不触发外部命令。
   if (pipelineTestingMode) {
-    console.log(chalk.gray('    ⏭️ Skipping external tools (pipeline testing mode)'));
+    console.log(chalk.gray('    ⏭️ 当前为流水线测试模式，已跳过外部工具'));
     return {
-      schemathesis: { tool: 'schemathesis', output: 'Skipped (pipeline testing mode)', status: 'skipped', duration: 0 }
+      schemathesis: { tool: 'schemathesis', output: '已跳过（流水线测试模式）', status: 'skipped', duration: 0 }
     };
   }
 
   const operations: Promise<TerminalScanResult>[] = [];
 
   // Parallel additional scans (only run if tools are available)
+  // 仅对可用工具创建任务，避免无效调用。
 
   if (toolAvailability.schemathesis) {
     operations.push(runTerminalScan('schemathesis', webUrl, sourceDir));
   }
 
   // If no tools are available, return early
+  // 无可执行任务时快速返回，减少无意义等待。
   if (operations.length === 0) {
-    console.log(chalk.gray('    ⏭️ No Wave 2 tools available'));
+    console.log(chalk.gray('    ⏭️ 第二波无可用工具'));
     return {
-      schemathesis: { tool: 'schemathesis', output: 'Tool not available', status: 'skipped', duration: 0 }
+      schemathesis: { tool: 'schemathesis', output: '工具不可用', status: 'skipped', duration: 0 }
     };
   }
 
   // Run all operations in parallel
+  // 并行执行以缩短阶段总时长。
   const results = await Promise.all(operations);
 
   // Map results back to named properties
+  // 将位置数组结果恢复为具名字段，提升可读性与调用安全。
   const response: Wave2Results = {
-    schemathesis: { tool: 'schemathesis', output: 'Tool not available', status: 'skipped', duration: 0 }
+    schemathesis: { tool: 'schemathesis', output: '工具不可用', status: 'skipped', duration: 0 }
   };
   let resultIndex = 0;
 
   if (toolAvailability.schemathesis) {
     response.schemathesis = results[resultIndex++]!;
   } else {
-    console.log(chalk.gray('    ⏭️ schemathesis - tool not available'));
+    console.log(chalk.gray('    ⏭️ schemathesis - 工具不可用'));
   }
 
   return response;
 }
 
 // Extracts status and output from a Wave1 tool result
+// 将不同 kind 的结果归一化为通用展示结构，便于统一拼接 markdown 报告。
 function extractResult(r: Wave1ToolResult | undefined): { status: string; output: string } {
-  if (!r) return { status: 'Skipped', output: 'No output' };
+  if (!r) return { status: 'Skipped', output: '无输出' };
   switch (r.kind) {
     case 'scan':
-      return { status: r.result.status || 'Skipped', output: r.result.output || 'No output' };
+      return { status: r.result.status || 'Skipped', output: r.result.output || '无输出' };
     case 'skipped':
       return { status: 'Skipped', output: r.message };
     case 'agent':
-      return { status: r.result.success ? 'success' : 'error', output: 'See agent output' };
+      return { status: r.result.success ? 'success' : 'error', output: '详见智能体输出' };
   }
 }
 
 // Combines tool outputs into single deliverable. Falls back to reference if file missing.
+// 将 Wave1/Wave2 的异构输出汇总为 `pre_recon_deliverable.md`。
+// 当代码分析文件缺失时，保留路径提示以降低阶段失败概率。
 async function stitchPreReconOutputs(wave1: Wave1Results, additionalScans: TerminalScanResult[], sourceDir: string): Promise<string> {
   // Try to read the code analysis deliverable file
-  let codeAnalysisContent = 'No analysis available';
+  // 代码分析是后续阶段的重要上下文，优先内联其内容。
+  let codeAnalysisContent = '暂无分析结果';
   try {
     const codeAnalysisPath = path.join(sourceDir, 'deliverables', 'code_analysis_deliverable.md');
     codeAnalysisContent = await fs.readFile(codeAnalysisPath, 'utf8');
   } catch (error) {
     const err = error as Error;
-    console.log(chalk.yellow(`⚠️ Could not read code analysis deliverable: ${err.message}`));
-    codeAnalysisContent = 'Analysis located in deliverables/code_analysis_deliverable.md';
+    console.log(chalk.yellow(`⚠️ 读取代码分析交付物失败：${err.message}`));
+    codeAnalysisContent = '分析结果位于 deliverables/code_analysis_deliverable.md';
   }
 
   // Build additional scans section
+  // 将补充扫描按工具分段写入，便于审阅与定位证据来源。
   let additionalSection = '';
   if (additionalScans.length > 0) {
     additionalSection = '\n## Authenticated Scans\n';
@@ -328,11 +356,13 @@ Report generated at: ${new Date().toISOString()}
   `.trim();
 
   // Ensure deliverables directory exists in the cloned repo
+  // 落盘前确保目录存在，避免因目录缺失造成阶段失败。
   try {
     const deliverablePath = path.join(sourceDir, 'deliverables', 'pre_recon_deliverable.md');
     await fs.ensureDir(path.join(sourceDir, 'deliverables'));
 
     // Write to file in the cloned repository
+    // 将汇总报告写回目标仓库，供后续阶段与最终报告消费。
     await fs.writeFile(deliverablePath, report);
   } catch (error) {
     const err = error as Error;
@@ -348,6 +378,7 @@ Report generated at: ${new Date().toISOString()}
 }
 
 // Main pre-recon phase execution function
+// 预侦察阶段总入口，按“Wave1 -> Wave2 -> 汇总输出”顺序编排。
 export async function executePreReconPhase(
   webUrl: string,
   sourceDir: string,
@@ -358,24 +389,24 @@ export async function executePreReconPhase(
   sessionId: string | null = null,
   outputPath: string | null = null
 ): Promise<PreReconResult> {
-  console.log(chalk.yellow.bold('\n🔍 PHASE 1: PRE-RECONNAISSANCE'));
+  console.log(chalk.yellow.bold('\n🔍 阶段 1：预侦察'));
   const timer = new Timer('phase-1-pre-recon');
 
-  console.log(chalk.yellow('Wave 1: Initial footprinting...'));
+  console.log(chalk.yellow('第一波：基础指纹探测...'));
   const wave1Results = await runPreReconWave1(webUrl, sourceDir, variables, config, pipelineTestingMode, sessionId, outputPath);
-  console.log(chalk.green('  ✅ Wave 1 operations completed'));
+  console.log(chalk.green('  ✅ 第一波任务已完成'));
 
-  console.log(chalk.yellow('Wave 2: Additional scanning...'));
+  console.log(chalk.yellow('第二波：补充扫描...'));
   const wave2Results = await runPreReconWave2(webUrl, sourceDir, toolAvailability, pipelineTestingMode);
-  console.log(chalk.green('  ✅ Wave 2 operations completed'));
+  console.log(chalk.green('  ✅ 第二波任务已完成'));
 
-  console.log(chalk.blue('📝 Stitching pre-recon outputs...'));
+  console.log(chalk.blue('📝 正在汇总预侦察输出...'));
   const additionalScans = wave2Results.schemathesis ? [wave2Results.schemathesis] : [];
   const preReconReport = await stitchPreReconOutputs(wave1Results, additionalScans, sourceDir);
   const duration = timer.stop();
 
-  console.log(chalk.green(`✅ Pre-reconnaissance complete in ${formatDuration(duration)}`));
-  console.log(chalk.green(`💾 Saved to ${sourceDir}/deliverables/pre_recon_deliverable.md`));
+  console.log(chalk.green(`✅ 预侦察阶段完成，总耗时 ${formatDuration(duration)}`));
+  console.log(chalk.green(`💾 已保存到 ${sourceDir}/deliverables/pre_recon_deliverable.md`));
 
   return { duration, report: preReconReport };
 }

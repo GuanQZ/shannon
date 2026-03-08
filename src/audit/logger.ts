@@ -5,15 +5,25 @@
 // as published by the Free Software Foundation.
 
 /**
+ * 文件说明：
+ * 提供追加写（append-only）日志能力，记录各代理阶段输入输出、状态与关键事件。
+ * 该文件保证日志可追溯且尽量避免覆盖写导致的信息丢失。
+ */
+
+/**
  * Append-Only Agent Logger
+ * Append-仅 代理 日志器。
  *
  * Provides crash-safe, append-only logging for agent execution.
+ * Provides crash-安全, append-仅 日志记录 for 代理 execution.。
  * Uses file streams with immediate flush to prevent data loss.
+ * Uses 文件 streams with immediate flush to 防止 data loss.。
  */
 
 import fs from 'fs';
 import {
   generateLogPath,
+  generateChineseLogPath,
   generatePromptPath,
   type SessionMetadata,
 } from './utils.js';
@@ -26,8 +36,116 @@ interface LogEvent {
   data: unknown;
 }
 
+// Check if event type should be displayed in dashboard (filtered view)
+function shouldDisplayEvent(eventType: string, eventData: unknown): boolean {
+  // Always include agent start/end
+  if (eventType === 'agent_start' || eventType === 'agent_end') {
+    return true;
+  }
+
+  // For llm_response, check the content
+  if (eventType === 'llm_response') {
+    const data = eventData as { content?: string };
+    if (data?.content) {
+      try {
+        const parsed = JSON.parse(data.content);
+        // Include thinking and text, exclude tool_use
+        if (parsed.type === 'thinking' || parsed.type === 'text' || !parsed.type) {
+          return true;
+        }
+      } catch {
+        // If not JSON, include as text
+        return data.content.trim().length > 0;
+      }
+    }
+  }
+
+  return false;
+}
+
+// Extract displayable content from event
+function extractDisplayContent(eventType: string, eventData: unknown): string | null {
+  if (eventType === 'agent_start') {
+    const data = eventData as { agentName?: string };
+    return `Agent ${data.agentName || 'unknown'} started`;
+  }
+
+  if (eventType === 'agent_end') {
+    const data = eventData as { agentName?: string; success?: boolean };
+    return `Agent ${data.agentName || 'unknown'} ${data.success ? 'completed successfully' : 'failed'}`;
+  }
+
+  if (eventType === 'llm_response') {
+    const data = eventData as { content?: string };
+    if (data?.content) {
+      try {
+        const parsed = JSON.parse(data.content);
+        if (parsed.type === 'thinking') {
+          return parsed.thinking;
+        }
+        if (parsed.type === 'text' || !parsed.type) {
+          return data.content;
+        }
+      } catch {
+        return data.content;
+      }
+    }
+  }
+
+  return null;
+}
+
+// Translate text to Chinese using AI API
+async function translateToChinese(text: string): Promise<string> {
+  // Skip if already contains Chinese
+  const chineseRegex = /[\u4e00-\u9fa5]/;
+  if (chineseRegex.test(text)) {
+    return text;
+  }
+
+  // Get API key from environment
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const baseUrl = process.env.ANTHROPIC_BASE_URL || 'https://api.minimaxi.com/anthropic';
+  const model = process.env.ANTHROPIC_MODEL || 'minimax-m2.5';
+
+  if (!apiKey) {
+    console.warn('ANTHROPIC_API_KEY not set, skipping translation');
+    return text;
+  }
+
+  try {
+    const response = await fetch(`${baseUrl}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 1024,
+        system: 'You are a translator. Translate the text to Simplified Chinese ONLY. Output ONLY the translation, no original text, no explanations. Keep technical terms (CVEs, payloads, endpoints, HTTP methods, file paths, code) in English. Do not include any prefix like [agent] or labels.',
+        messages: [{ role: 'user', content: text }]
+      })
+    });
+
+    const data = await response.json() as {
+      content?: Array<{ type?: string; text?: string; thinking?: string }>
+    };
+    // Find the text content (skip thinking type)
+    const textContent = data.content?.find(c => c.type === 'text');
+    const result = textContent?.text || text;
+    console.log('[Chinese Translation] Translated:', text.substring(0, 50), '->', result.substring(0, 50));
+    return result;
+  } catch (e) {
+    console.error('Translation error:', e);
+    return text;
+  }
+}
+
 /**
  * AgentLogger - Manages append-only logging for a single agent execution
+ * AgentLogger - Manages append-仅 日志记录 for a single 代理 execution。
  */
 export class AgentLogger {
   private sessionMetadata: SessionMetadata;
@@ -35,7 +153,9 @@ export class AgentLogger {
   private attemptNumber: number;
   private timestamp: number;
   private logPath: string;
+  private chineseLogPath: string;
   private stream: fs.WriteStream | null = null;
+  private chineseStream: fs.WriteStream | null = null;
   private isOpen: boolean = false;
 
   constructor(sessionMetadata: SessionMetadata, agentName: string, attemptNumber: number) {
@@ -45,11 +165,17 @@ export class AgentLogger {
     this.timestamp = Date.now();
 
     // Generate log file path
+    // 生成 log 文件 path。
     this.logPath = generateLogPath(sessionMetadata, agentName, this.timestamp, attemptNumber);
+
+    // Generate Chinese log file path
+    // 生成中文 log 文件 path。
+    this.chineseLogPath = generateChineseLogPath(sessionMetadata, agentName);
   }
 
   /**
    * Initialize the log stream (creates file and opens stream)
+   * Initialize the log stream (creates 文件 and opens stream)。
    */
   async initialize(): Promise<void> {
     if (this.isOpen) {
@@ -57,8 +183,17 @@ export class AgentLogger {
     }
 
     // Create write stream with append mode and auto-flush
+    // 创建 写入 stream with append 模式 and auto-flush。
     this.stream = fs.createWriteStream(this.logPath, {
       flags: 'a', // Append mode
+      encoding: 'utf8',
+      autoClose: true,
+    });
+
+    // Create Chinese log stream (overwrite mode - each run starts fresh)
+    // 创建中文 log stream（覆盖模式 - 每次运行重新开始）。
+    this.chineseStream = fs.createWriteStream(this.chineseLogPath, {
+      flags: 'w', // Write mode (overwrite)
       encoding: 'utf8',
       autoClose: true,
     });
@@ -66,11 +201,13 @@ export class AgentLogger {
     this.isOpen = true;
 
     // Write header
+    // 写入 header。
     await this.writeHeader();
   }
 
   /**
    * Write header to log file
+   * 写入 header to log 文件。
    */
   private async writeHeader(): Promise<void> {
     const header = [
@@ -88,6 +225,7 @@ export class AgentLogger {
 
   /**
    * Write raw text to log file with immediate flush
+   * 写入 raw text to log 文件 with immediate flush。
    */
   private writeRaw(text: string): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -110,7 +248,9 @@ export class AgentLogger {
 
   /**
    * Log an event (tool_start, tool_end, llm_response, etc.)
+   * Log an event (tool_start, tool_end, llm_response, etc.)。
    * Events are logged as JSON for parseability
+   * Events are logged as JSON for parseability。
    */
   async logEvent(eventType: string, eventData: unknown): Promise<void> {
     const event: LogEvent = {
@@ -120,28 +260,67 @@ export class AgentLogger {
     };
 
     const eventLine = `${JSON.stringify(event)}\n`;
-    return this.writeRaw(eventLine);
+    await this.writeRaw(eventLine);
+
+    // Also write to Chinese log if this is a displayable event
+    // 同时写入中文日志（如果是需要显示的事件）。
+    if (shouldDisplayEvent(eventType, eventData)) {
+      const displayContent = extractDisplayContent(eventType, eventData);
+      if (displayContent) {
+        // Translate and write asynchronously (don't block)
+        translateToChinese(displayContent).then(chineseContent => {
+          const chineseLine = JSON.stringify({
+            type: eventType,
+            timestamp: formatTimestamp(),
+            agent: this.agentName,
+            content: chineseContent
+          }) + '\n';
+
+          if (this.chineseStream) {
+            this.chineseStream.write(chineseLine, 'utf8');
+          }
+        }).catch(err => {
+          console.error('Failed to translate log:', err);
+        });
+      }
+    }
   }
 
   /**
    * Close the log stream
+   * Close the log stream。
    */
   async close(): Promise<void> {
-    if (!this.isOpen || !this.stream) {
+    if (!this.isOpen) {
       return;
     }
 
-    return new Promise((resolve) => {
-      this.stream!.end(() => {
-        this.isOpen = false;
-        resolve();
+    // Close English log stream first
+    if (this.stream) {
+      await new Promise<void>((resolve) => {
+        this.stream!.end(() => {
+          resolve();
+        });
       });
-    });
+    }
+
+    // Close Chinese log stream
+    if (this.chineseStream) {
+      await new Promise<void>((resolve) => {
+        this.chineseStream!.end(() => {
+          resolve();
+        });
+      });
+    }
+
+    this.isOpen = false;
   }
 
   /**
    * Save prompt snapshot to prompts directory
+   * 保存 prompt snapshot to prompts directory。
    * Static method - doesn't require logger instance
+   * Static method - doesn't require 日志器 instance。
    */
   static async savePrompt(
     sessionMetadata: SessionMetadata,
@@ -151,6 +330,7 @@ export class AgentLogger {
     const promptPath = generatePromptPath(sessionMetadata, agentName);
 
     // Create header with metadata
+    // 创建 header with metadata。
     const header = [
       `# Prompt Snapshot: ${agentName}`,
       ``,
@@ -165,6 +345,7 @@ export class AgentLogger {
     const fullContent = header + promptContent;
 
     // Use atomic write for safety
+    // 使用 atomic 写入 for safety。
     await atomicWrite(promptPath, fullContent);
   }
 }

@@ -85,7 +85,8 @@ RUN apk update && apk add --no-cache \
     libxrandr \
     mesa-gbm \
     # Font rendering
-    fontconfig
+    fontconfig \
+    font-noto-cjk
 
 # Copy Go binaries from builder
 COPY --from=builder /go/bin/subfinder /usr/local/bin/
@@ -113,8 +114,45 @@ COPY package*.json ./
 COPY mcp-server/package*.json ./mcp-server/
 
 # Install Node.js dependencies (including devDependencies for TypeScript build)
-RUN npm ci && \
-    cd mcp-server && npm ci && cd .. && \
+# Use retry mechanism to handle transient network errors
+RUN set -e; \
+    max_retries=3; \
+    retry_delay=5; \
+    for attempt in $(seq 1 $max_retries); do \
+        echo "npm ci attempt $attempt of $max_retries"; \
+        if npm ci --prefer-offline --no-audit --loglevel=error; then \
+            echo "npm ci succeeded"; \
+            break; \
+        else \
+            if [ $attempt -lt $max_retries ]; then \
+                echo "npm ci failed, retrying in $retry_delay seconds..."; \
+                sleep $retry_delay; \
+                retry_delay=$((retry_delay * 2)); \
+            else \
+                echo "npm ci failed after $max_retries attempts"; \
+                exit 1; \
+            fi; \
+        fi; \
+    done && \
+    cd mcp-server && \
+    retry_delay=5; \
+    for attempt in $(seq 1 $max_retries); do \
+        echo "mcp-server npm ci attempt $attempt of $max_retries"; \
+        if npm ci --prefer-offline --no-audit --loglevel=error; then \
+            echo "mcp-server npm ci succeeded"; \
+            break; \
+        else \
+            if [ $attempt -lt $max_retries ]; then \
+                echo "mcp-server npm ci failed, retrying in $retry_delay seconds..."; \
+                sleep $retry_delay; \
+                retry_delay=$((retry_delay * 2)); \
+            else \
+                echo "mcp-server npm ci failed after $max_retries attempts"; \
+                exit 1; \
+            fi; \
+        fi; \
+    done && \
+    cd .. && \
     npm cache clean --force
 
 # Copy application source code

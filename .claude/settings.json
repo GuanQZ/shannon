@@ -1,0 +1,47 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh repo view GuanQZ/shannon-target --json name,description,url)",
+      "Bash(docker compose build --progress=plain worker)",
+      "Read(//private/tmp/**)",
+      "Bash(pkill -f \"docker compose build worker\")",
+      "Bash(docker compose build worker)",
+      "Bash(tee /tmp/build-worker.log)",
+      "Bash(./shannon start URL=http://host.docker.internal:8080 REPO=shannon-target CONFIG=./configs/shannon-target.yaml)",
+      "Bash(docker compose up -d)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080/)",
+      "Bash(lsof -i :3457)",
+      "Bash(./shannon start URL=http://localhost:8080 REPO=shannon-target CONFIG=./configs/shannon-target.yaml)",
+      "Bash(docker cp /Users/zengguanqin/VSCodeWorkspace/shannon/dist/phases/translation.js shannon-worker-1:/app/dist/phases/translation.js)",
+      "Bash(docker compose restart worker)",
+      "Bash(docker exec shannon-worker-1 cat /app/dist/phases/translation.js)",
+      "Bash(docker compose up -d worker)",
+      "Bash(node -e \":*)",
+      "Bash(npm run build)",
+      "Bash(ls -la /Users/zengguanqin/VSCodeWorkspace/shannon/repos/shannon-target/.playwright-mcp/*.log)",
+      "Bash(ls -lt /Users/zengguanqin/VSCodeWorkspace/shannon/repos/shannon-target/.playwright-mcp/*.log)",
+      "Bash(npm install)",
+      "Bash(export PATH=\"/usr/local/opt/node@20/bin:$PATH\")",
+      "Bash(ls /Users/zengguanqin/VSCodeWorkspace/shannon/repos/shannon-target/deliverables/*.md)",
+      "Bash(node dist/temporal/activities.js)",
+      "Bash(node dist/translate-reports.js /Users/zengguanqin/VSCodeWorkspace/shannon/repos/shannon-target)",
+      "Bash(docker compose exec worker ls -la /repos/shannon-target/)",
+      "Bash(docker compose exec worker ls -la /repos/shannon-target/screenshots/)",
+      "Bash(docker compose exec worker find /repos -name \"*.png\")",
+      "Bash(docker build -t shannon-worker:test -f Dockerfile .)",
+      "Bash(docker run --rm -it shannon-worker:test node dist/shannon.js --help)",
+      "Bash(docker run --rm -i shannon-worker:test node dist/shannon.js --help)",
+      "Bash(docker run --rm shannon-worker:test ls -la /app/)",
+      "Bash(docker create --name shannon-test shannon-worker:test)",
+      "Bash(docker cp shannon-test:/app -)",
+      "Bash(tar -tf -)",
+      "Bash(docker exec shannon-worker-1 ls -la /app/dist/shannon.js)",
+      "Bash(docker exec shannon-worker-1 ls -la /app/dist/temporal/worker.js)",
+      "Bash(docker ps --format \"table {{.Names}}\\\\t{{.Status}}\")",
+      "Bash(docker run --rm shannon-worker:latest ls /app/node_modules/)"
+    ],
+    "additionalDirectories": [
+      "/Users/zengguanqin/VSCodeWorkspace/shannon/repos/shannon-target"
+    ]
+  }
+}

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shannon 渗透测试监控</title>
+  <link rel="stylesheet" href="/dashboard.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>Shannon 渗透测试监控</h1>
+      <select id="session-select" class="session-select" onchange="switchSession(this.value)">
+        <option value="">加载中...</option>
+      </select>
+      <span id="connection-status" class="status disconnected">未连接</span>
+      <button id="toggle-filtered" class="toggle-btn" onclick="toggleToolLogs()">
+        显示工具调用
+      </button>
+    </header>
+
+    <aside class="sidebar-left" id="phase-progress">
+      <h3>阶段进度</h3>
+      <!-- 阶段进度动态生成 -->
+    </aside>
+
+    <main class="main-content" id="log-container">
+      <div class="log-empty">等待日志...</div>
+    </main>
+
+    <aside class="sidebar-right" id="agent-list">
+      <h3>智能体列表</h3>
+      <!-- Agent列表动态生成 -->
+    </aside>
+  </div>
+
+  <script src="/dashboard.js"></script>
+</body>
+</html>

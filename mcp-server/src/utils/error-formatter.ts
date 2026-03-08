@@ -5,15 +5,24 @@
 // as published by the Free Software Foundation.
 
 /**
+ * 文件说明：
+ * 封装 MCP 工具错误格式化逻辑，将异常转换为可读且结构化的错误结果。
+ * 该文件用于统一错误呈现并降低排障成本。
+ */
+
+/**
  * Error Formatting Utilities
+ * 错误 Formatting Utilities。
  *
  * Helper functions for creating structured error responses.
+ * 辅助 函数 for creating structured 错误 responses.。
  */
 
 import type { ErrorResponse } from '../types/tool-responses.js';
 
 /**
  * Create a validation error response
+ * 创建 a 校验 错误 response。
  */
 export function createValidationError(
   message: string,
@@ -31,6 +40,7 @@ export function createValidationError(
 
 /**
  * Create a crypto error response
+ * 创建 a crypto 错误 response。
  */
 export function createCryptoError(
   message: string,
@@ -48,6 +58,7 @@ export function createCryptoError(
 
 /**
  * Create a generic error response
+ * 创建 a generic 错误 response。
  */
 export function createGenericError(
   error: unknown,

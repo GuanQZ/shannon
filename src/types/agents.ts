@@ -5,7 +5,14 @@
 // as published by the Free Software Foundation.
 
 /**
+ * 文件说明：
+ * 定义代理名称、阶段映射、提示模板名称等与 agent 编排相关的类型。
+ * 该文件为编排层和执行层提供统一的类型约束。
+ */
+
+/**
  * Agent type definitions
+ * 代理 类型 definitions。
  */
 
 export type AgentName =
@@ -62,6 +69,7 @@ export interface AgentDefinition {
 
 /**
  * Maps an agent name to its corresponding prompt file name.
+ * Maps an 代理 name to its corresponding prompt 文件 name.。
  */
 export function getPromptNameForAgent(agentName: AgentName): PromptName {
   const mappings: Record<AgentName, PromptName> = {

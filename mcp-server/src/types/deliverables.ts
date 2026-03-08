@@ -5,20 +5,32 @@
 // as published by the Free Software Foundation.
 
 /**
+ * 文件说明：
+ * 定义交付物对象结构与相关类型，约束保存工具输入输出契约。
+ * 该文件确保不同 agent 输出在类型层面一致。
+ */
+
+/**
  * Deliverable Type Definitions
+ * 交付物类型定义。
  *
  * Maps deliverable types to their filenames and defines validation requirements.
+ * 定义交付物类型与文件名映射，并声明对应校验要求。
  * Must match the exact mappings from tools/save_deliverable.js.
+ * 必须与 tools/save_deliverable.js 中的映射保持一致。
  */
 
 export enum DeliverableType {
   // Pre-recon agent
+  // 预侦察代理。
   CODE_ANALYSIS = 'CODE_ANALYSIS',
 
   // Recon agent
+  // 侦察代理。
   RECON = 'RECON',
 
   // Vulnerability analysis agents
+  // 漏洞分析代理。
   INJECTION_ANALYSIS = 'INJECTION_ANALYSIS',
   INJECTION_QUEUE = 'INJECTION_QUEUE',
 
@@ -35,6 +47,7 @@ export enum DeliverableType {
   SSRF_QUEUE = 'SSRF_QUEUE',
 
   // Exploitation agents
+  // 利用代理。
   INJECTION_EVIDENCE = 'INJECTION_EVIDENCE',
   XSS_EVIDENCE = 'XSS_EVIDENCE',
   AUTH_EVIDENCE = 'AUTH_EVIDENCE',
@@ -44,7 +57,9 @@ export enum DeliverableType {
 
 /**
  * Hard-coded filename mappings from agent prompts
+ * 来自代理提示模板的固定文件名映射。
  * Must match tools/save_deliverable.js exactly
+ * 必须与 tools/save_deliverable.js 完全一致。
  */
 export const DELIVERABLE_FILENAMES: Record<DeliverableType, string> = {
   [DeliverableType.CODE_ANALYSIS]: 'code_analysis_deliverable.md',
@@ -68,6 +83,7 @@ export const DELIVERABLE_FILENAMES: Record<DeliverableType, string> = {
 
 /**
  * Queue types that require JSON validation
+ * 需要 JSON 校验的队列类型。
  */
 export const QUEUE_TYPES: DeliverableType[] = [
   DeliverableType.INJECTION_QUEUE,
@@ -79,6 +95,7 @@ export const QUEUE_TYPES: DeliverableType[] = [
 
 /**
  * Type guard to check if a deliverable type is a queue
+ * 类型守卫：判断交付物类型是否属于队列。
  */
 export function isQueueType(type: string): boolean {
   return QUEUE_TYPES.includes(type as DeliverableType);
@@ -86,6 +103,7 @@ export function isQueueType(type: string): boolean {
 
 /**
  * Vulnerability queue structure
+ * 漏洞 队列 结构。
  */
 export interface VulnerabilityQueue {
   vulnerabilities: VulnerabilityItem[];

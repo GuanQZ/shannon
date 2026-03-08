@@ -1,0 +1,20 @@
+# Shannon-target Configuration
+# 渗透测试靶场 - 自定义漏洞应用
+
+authentication:
+  login_type: form
+  login_url: "http://host.docker.internal:8080/login"
+  credentials:
+    username: "admin"
+    password: "password123"
+
+  # Login flow
+  login_flow:
+    - "Navigate to the login page"
+    - "Type $username into the username field"
+    - "Type $password into the password field"
+    - "Click the 'Login' button"
+
+  success_condition:
+    type: url_contains
+    value: "/dashboard"
