@@ -180,7 +180,7 @@ USER pentest
 # Set environment variables
 ENV NODE_ENV=production
 ENV PATH="/usr/local/bin:$PATH"
-ENV SHANNON_DOCKER=true
+ENV LUMIN_DOCKER=true
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
 ENV npm_config_cache=/tmp/.npm

@@ -119,6 +119,7 @@ const HEARTBEAT_INTERVAL_MS = 2000; // Must be < heartbeatTimeout (10min product
 export interface ActivityInput {
   webUrl: string;
   repoPath: string;
+  repos?: string;  // Comma-separated list of repo names/URLs for multi-repo mode
   configPath?: string;
   outputPath?: string;
   pipelineTestingMode?: boolean;

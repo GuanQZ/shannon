@@ -175,6 +175,7 @@ export async function pentestPipelineWorkflow(
   const activityInput: ActivityInput = {
     webUrl: input.webUrl,
     repoPath: input.repoPath,
+    ...(input.repos !== undefined && { repos: input.repos }),
     workflowId,
     ...(input.configPath !== undefined && { configPath: input.configPath }),
     ...(input.outputPath !== undefined && { outputPath: input.outputPath }),

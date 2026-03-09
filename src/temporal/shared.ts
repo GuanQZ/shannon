@@ -12,6 +12,7 @@ import { defineQuery } from '@temporalio/workflow';
 export interface PipelineInput {
   webUrl: string;
   repoPath: string;
+  repos?: string;  // Comma-separated list of repo names/URLs for multi-repo mode
   configPath?: string;
   outputPath?: string;
   pipelineTestingMode?: boolean;

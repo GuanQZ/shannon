@@ -108,6 +108,9 @@ IMPORTANT: Do NOT reorder the existing exploitation evidence sections. Maintain 
      NOTE: these sections will contain vulnerability lists with IDs matching pattern `### [TYPE]-VULN-[NUMBER]`
      * `# [Type] Exploitation Evidence`
      * `## Successfully Exploited Vulnerabilities`
+     * `**截图：**` (Screenshot sections with image references - CRITICAL, must preserve)
+     * `**Screenshot:**` (English screenshot sections)
+     * Any section containing `![` image markdown references
    - REMOVE ANY OTHER SECTIONS (even if they contain vulnerability IDs), such as:
      * `## Potential Vulnerabilities (Validation Blocked)` (All agents)
      * Standalone "Recommendations" sections
@@ -120,6 +123,7 @@ IMPORTANT: Do NOT reorder the existing exploitation evidence sections. Maintain 
      * any intros in the sections
      * any counts in the sections
    - Preserve exact vulnerability IDs and formatting
+   - **IMPORTANT**: Do NOT remove or modify any image references (`![Description](path.png)`) - these are critical evidence
 
 4. Combine the content:
    - Place the Executive Summary and Network Reconnaissance sections at the top

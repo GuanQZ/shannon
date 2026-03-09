@@ -25,24 +25,28 @@ fi
 show_help() {
   cat << 'EOF'
 
-  _    ____  ____  ____  _____ ____   __  __
- | |  / ___||  _ \|  _ \| ____|  _ \ |  \/  |
- | |  \___ \| |_) | |_) |  _| | |_) || |\/| |
- | |___ ___) |  _ <|  _/| |___|  _ < | |  | |
- |_____|____/|_| \_\_|  |_____|_| \_\|_|  |_|
-
+          ██╗     ██╗   ██╗███╗   ███╗██╗███╗   ██╗
+          ██║     ██║   ██║████╗ ████║██║████╗  ██║
+          ██║     ██║   ██║██╔████╔██║██║██╔██╗ ██║
+          ██║     ██║   ██║██║╚██╔╝██║██║██║╚██╗██║
+          ███████╗╚██████╔╝██║ ╚═╝ ██║██║██║ ╚████║
+          ╚══════╝ ╚═════╝ ╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝
+                                         
            AI Penetration Testing Framework
 
 Usage:
   ./lumin start URL=<url> REPO=<name>   Start a pentest workflow
+  ./lumin start URL=<url> REPOS=<name1,name2>  Start with multiple repos
   ./lumin logs ID=<workflow-id>         Tail logs for a specific workflow
   ./lumin query ID=<workflow-id>        Query workflow progress
   ./lumin stop                          Stop all containers
   ./lumin help                          Show this help message
 
 Options for 'start':
-  REPO=<name>            Folder name under ./repos/ (e.g. REPO=repo-name)
-  REPO=<git-url>         Git repository URL (will be cloned to isolated ./repos/_jobs/)
+  REPO=<name>            Single folder name under ./repos/ (e.g. REPO=repo-name)
+  REPO=<git-url>         Git repository URL (will be cloned to isolated ./repos/)
+  REPOS=<names>          Comma-separated folder names or git URLs (e.g. REPOS=frontend,backend)
+  REPOS=<git-url1,git-url2>  Multiple git URLs to clone
   CONFIG=<path>          Configuration file (YAML)
   OUTPUT=<path>          Output directory for reports (default: ./audit-logs/)
   SAFE_MODE=true|false   Default true. Enables safe defaults for external scans
@@ -57,6 +61,8 @@ Examples:
   ./lumin start URL=https://example.com REPO=repo-name
   ./lumin start URL=https://example.com REPO=repo-name CONFIG=./config.yaml
   ./lumin start URL=https://example.com REPO=repo-name OUTPUT=./my-reports
+  ./lumin start URL=https://example.com REPOS=frontend,backend
+  ./lumin start URL=https://example.com REPOS=https://github.com/org/frontend.git,https://github.com/org/backend.git
   ./lumin logs ID=example.com_lumin-1234567890
   ./lumin query ID=lumin-1234567890
   ./lumin stop CLEAN=true
@@ -71,6 +77,7 @@ parse_args() {
     case "$arg" in
       URL=*) URL="${arg#URL=}" ;;
       REPO=*) REPO="${arg#REPO=}" ;;
+      REPOS=*) REPOS="${arg#REPOS=}" ;;
       CONFIG=*) CONFIG="${arg#CONFIG=}" ;;
       OUTPUT=*) OUTPUT="${arg#OUTPUT=}" ;;
       ID=*) ID="${arg#ID=}" ;;
@@ -146,9 +153,17 @@ cmd_start() {
   export LUMIN_DISABLE_GIT_WRITES
 
   # Validate required vars
-  if [ -z "$URL" ] || [ -z "$REPO" ]; then
-    echo "ERROR: URL and REPO are required"
+  if [ -z "$URL" ]; then
+    echo "ERROR: URL is required"
     echo "Usage: ./lumin start URL=<url> REPO=<name>"
+    echo "       ./lumin start URL=<url> REPOS=<name1,name2>"
+    exit 1
+  fi
+
+  if [ -z "$REPO" ] && [ -z "$REPOS" ]; then
+    echo "ERROR: Either REPO or REPOS must be specified"
+    echo "Usage: ./lumin start URL=<url> REPO=<name>"
+    echo "       ./lumin start URL=<url> REPOS=<name1,name2>"
     exit 1
   fi
 
@@ -164,46 +179,117 @@ cmd_start() {
     fi
   fi
 
-  # Determine container path for REPO
-  # - If REPO is already a container path (/benchmarks/*, /repos/*), use as-is
-  # - Otherwise, treat as a folder name under ./repos/ (mounted at /repos in container)
-  if is_git_url "$REPO"; then
-    mkdir -p ./repos/_jobs
-    JOB_ID="$(date +%Y%m%d-%H%M%S)-$RANDOM"
-    CLONE_DIR="./repos/_jobs/$JOB_ID"
+  # Determine container path for REPO/REPOS
+  # - If REPOS is provided (comma-separated), use multiple repos
+  # - If REPO is provided, use single repo (backward compatible)
+  # - Each repo can be: git URL, folder name under ./repos/, or absolute path
 
-    echo "Cloning repository into isolated workspace: $CLONE_DIR"
-    git clone --depth 1 "$REPO" "$CLONE_DIR"
+  # Convert comma-separated REPOS to array
+  if [ -n "$REPOS" ]; then
+    REPO_LIST=$(echo "$REPOS" | tr ',' ' ')
+    REPO_COUNT=$(echo "$REPO_LIST" | wc -w)
+    echo "Processing $REPO_COUNT repositories..."
+  elif [ -n "$REPO" ]; then
+    REPO_LIST="$REPO"
+    REPO_COUNT=1
+  else
+    echo "ERROR: Either REPO or REPOS must be specified"
+    echo "Usage: ./lumin start URL=<url> REPO=<name>"
+    echo "       ./lumin start URL=<url> REPOS=<name1,name2>"
+    exit 1
+  fi
 
-    if [ "$SAFE_MODE" = "true" ] && [ -d "$CLONE_DIR/.git" ]; then
-      for remote in $(git -C "$CLONE_DIR" remote 2>/dev/null); do
-        git -C "$CLONE_DIR" remote set-url --push "$remote" DISABLED >/dev/null 2>&1 || true
-      done
-      echo "Safe mode: git push URL disabled for isolated workspace"
+  # Create isolated job directory for multiple repos or git URLs
+  if [ "$REPO_COUNT" -gt 1 ] || ( [ -n "$REPOS" ] && is_git_url "$REPO_LIST" ); then
+    mkdir -p ./repos
+    JOB_ID="lumin-$(date +%Y%m%d-%H%M%S)-$RANDOM"
+    CLONE_BASE="./repos/$JOB_ID"
+    mkdir -p "$CLONE_BASE"
+
+    echo "Cloning $REPO_COUNT repositories into isolated workspace: $CLONE_BASE"
+
+    for repo_item in $REPO_LIST; do
+      if is_git_url "$repo_item"; then
+        # Extract repo name from URL for folder name
+        repo_name=$(basename "$repo_item" .git)
+        repo_target="$CLONE_BASE/$repo_name"
+
+        echo "  Cloning $repo_item -> $repo_target"
+        git clone --depth 1 "$repo_item" "$repo_target"
+
+        if [ "$SAFE_MODE" = "true" ] && [ -d "$repo_target/.git" ]; then
+          for remote in $(git -C "$repo_target" remote 2>/dev/null); do
+            git -C "$repo_target" remote set-url --push "$remote" DISABLED >/dev/null 2>&1 || true
+          done
+        fi
+      else
+        # Local folder - create symlink
+        if [ -d "./repos/$repo_item" ]; then
+          repo_target="$CLONE_BASE/$repo_item"
+          if [ ! -L "$repo_target" ]; then
+            ln -sf "../$repo_item" "$repo_target"
+            echo "  Linking ./repos/$repo_item -> $repo_target"
+          fi
+
+          if [ "$SAFE_MODE" = "true" ] && [ -d "./repos/$repo_item/.git" ]; then
+            for remote in $(git -C "./repos/$repo_item" remote 2>/dev/null); do
+              git -C "./repos/$repo_item" remote set-url --push "$remote" DISABLED >/dev/null 2>&1 || true
+            done
+          fi
+        else
+          echo "ERROR: Repository not found at ./repos/$repo_item"
+          exit 1
+        fi
+      fi
+    done
+
+    if [ "$SAFE_MODE" = "true" ]; then
+      echo "Safe mode: git push URLs disabled for isolated workspace"
     fi
 
-    CONTAINER_REPO="/repos/_jobs/$JOB_ID"
+    CONTAINER_REPO="$CLONE_BASE"
+    export REPOS="$REPOS"  # Pass REPOS to container for multi-repo mode
   else
-    case "$REPO" in
-    /benchmarks/*|/repos/*)
-      CONTAINER_REPO="$REPO"
-      ;;
-    *)
-      if [ ! -d "./repos/$REPO" ]; then
-        echo "ERROR: Repository not found at ./repos/$REPO"
-        echo ""
-        echo "Place your target repository under the ./repos/ directory"
-        exit 1
-      fi
-      CONTAINER_REPO="/repos/$REPO"
-      ;;
-    esac
+    # Single local repo (backward compatible)
+    repo_item="$REPO_LIST"
+    if is_git_url "$repo_item"; then
+      mkdir -p ./repos
+      JOB_ID="lumin-$(date +%Y%m%d-%H%M%S)-$RANDOM"
+      CLONE_DIR="./repos/$JOB_ID"
 
-    if [ "$SAFE_MODE" = "true" ] && [ -d "./repos/$REPO/.git" ]; then
-      for remote in $(git -C "./repos/$REPO" remote 2>/dev/null); do
-        git -C "./repos/$REPO" remote set-url --push "$remote" DISABLED >/dev/null 2>&1 || true
-      done
-      echo "Safe mode: git push URL disabled for local workspace"
+      echo "Cloning repository into isolated workspace: $CLONE_DIR"
+      git clone --depth 1 "$repo_item" "$CLONE_DIR"
+
+      if [ "$SAFE_MODE" = "true" ] && [ -d "$CLONE_DIR/.git" ]; then
+        for remote in $(git -C "$CLONE_DIR" remote 2>/dev/null); do
+          git -C "$CLONE_DIR" remote set-url --push "$remote" DISABLED >/dev/null 2>&1 || true
+        done
+        echo "Safe mode: git push URL disabled for isolated workspace"
+      fi
+
+      CONTAINER_REPO="/repos/$JOB_ID"
+    else
+      case "$repo_item" in
+      /benchmarks/*|/repos/*)
+        CONTAINER_REPO="$repo_item"
+        ;;
+      *)
+        if [ ! -d "./repos/$repo_item" ]; then
+          echo "ERROR: Repository not found at ./repos/$repo_item"
+          echo ""
+          echo "Place your target repository under the ./repos/ directory"
+          exit 1
+        fi
+        CONTAINER_REPO="/repos/$repo_item"
+        ;;
+      esac
+
+      if [ "$SAFE_MODE" = "true" ] && [ -d "./repos/$repo_item/.git" ]; then
+        for remote in $(git -C "./repos/$repo_item" remote 2>/dev/null); do
+          git -C "./repos/$repo_item" remote set-url --push "$remote" DISABLED >/dev/null 2>&1 || true
+        done
+        echo "Safe mode: git push URL disabled for local workspace"
+      fi
     fi
   fi
 
@@ -271,6 +357,11 @@ cmd_start() {
   fi
 
   [ "$PIPELINE_TESTING" = "true" ] && ARGS="$ARGS --pipeline-testing"
+
+  # Pass REPOS if multiple repositories
+  if [ -n "$REPOS" ]; then
+    ARGS="$ARGS --repos $REPOS"
+  fi
 
   # Run the client to submit workflow
   docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE exec -T worker \

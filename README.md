@@ -72,7 +72,7 @@ Lumin is available in two editions:
 > **White-box only.** Lumin Lite is designed for **white-box (source-available)** application security testing.  
 > It expects access to your application's source code and repository layout.
 
-[See feature comparison](./SHANNON-PRO.md)
+[See feature comparison](./LUMIN-PRO.md)
 ## 📑 Table of Contents
 
 - [What is Lumin?](#-what-is-lumin)

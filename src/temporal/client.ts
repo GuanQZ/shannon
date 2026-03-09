@@ -98,6 +98,7 @@ async function startPipeline(): Promise<void> {
   // 解析命令行参数。
   let webUrl: string | undefined;
   let repoPath: string | undefined;
+  let repos: string | undefined;  // Comma-separated list of repo names/URLs
   let configPath: string | undefined;
   let outputPath: string | undefined;
   let displayOutputPath: string | undefined; // Host path for display purposes
@@ -129,6 +130,12 @@ async function startPipeline(): Promise<void> {
       const nextArg = args[i + 1];
       if (nextArg && !nextArg.startsWith('-')) {
         customWorkflowId = nextArg;
+        i++;
+      }
+    } else if (arg === '--repos') {
+      const nextArg = args[i + 1];
+      if (nextArg && !nextArg.startsWith('-')) {
+        repos = nextArg;
         i++;
       }
     } else if (arg === '--pipeline-testing') {
@@ -167,6 +174,7 @@ async function startPipeline(): Promise<void> {
     const input: PipelineInput = {
       webUrl,
       repoPath,
+      ...(repos && { repos }),
       ...(configPath && { configPath }),
       ...(outputPath && { outputPath }),
       ...(pipelineTestingMode && { pipelineTestingMode }),
@@ -185,7 +193,11 @@ async function startPipeline(): Promise<void> {
     console.log(chalk.green.bold(`✓ 工作流已启动：${workflowId}`));
     console.log();
     console.log(chalk.white('  目标地址：   ') + chalk.cyan(webUrl));
-    console.log(chalk.white('  代码仓库：   ') + chalk.cyan(repoPath));
+    if (repos) {
+      console.log(chalk.white('  代码仓库：   ') + chalk.cyan(repos));
+    } else {
+      console.log(chalk.white('  代码仓库：   ') + chalk.cyan(repoPath));
+    }
     if (configPath) {
       console.log(chalk.white('  配置文件：   ') + chalk.cyan(configPath));
     }
