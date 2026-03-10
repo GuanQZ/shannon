@@ -46,6 +46,7 @@ import { detectExecutionContext, formatErrorOutput, formatCompletionMessage } fr
 import { createProgressManager } from './progress-manager.js';
 import { createAuditLogger } from './audit-logger.js';
 import { getActualModelName } from './router-utils.js';
+import { InternalAgentClient, isInternalAgentEnabled } from './providers/internal-agent.js';
 
 declare global {
   var LUMIN_DISABLE_LOADER: boolean | undefined;
@@ -295,6 +296,19 @@ export async function runClaudePrompt(
 
   progress.start();
 
+  // Check if internal agent is enabled
+  // 如果配置了内网 Agent，使用内网 Agent 替代 Claude SDK
+  if (isInternalAgentEnabled()) {
+    return await runInternalAgentPrompt(
+      fullPrompt,
+      sourceDir,
+      description,
+      timer,
+      progress,
+      auditLogger
+    );
+  }
+
   try {
     const messageLoopResult = await processMessageStream(
       fullPrompt,
@@ -460,6 +474,82 @@ async function processMessageStream(
   }
 
   return { turnCount, result, apiErrorDetected, cost, model };
+}
+
+// Internal agent prompt execution
+// 使用内网 Agent 替代 Claude SDK 执行任务
+async function runInternalAgentPrompt(
+  prompt: string,
+  sourceDir: string,
+  description: string,
+  timer: Timer,
+  progress: ReturnType<typeof createProgressManager>,
+  auditLogger: ReturnType<typeof createAuditLogger>
+): Promise<ClaudePromptResult> {
+  const internalAgent = InternalAgentClient.create();
+
+  if (!internalAgent) {
+    throw new Error('Failed to create internal agent client');
+  }
+
+  console.log(chalk.blue(`  正在执行内网 Agent：${description}...`));
+
+  try {
+    // Initialize session
+    await internalAgent.initSession();
+
+    // Send chat request
+    const chatResponse = await internalAgent.chat(prompt);
+
+    const duration = timer.stop();
+    timingResults.agents[`internal-agent-${description.toLowerCase().replace(/\s+/g, '-')}`] = duration;
+
+    const execContext = {
+      isParallelExecution: false,
+      useCleanOutput: false,
+      agentType: 'internal-agent',
+      agentKey: 'internal-agent',
+    };
+
+    progress.finish(formatCompletionMessage(
+      execContext,
+      description,
+      1,
+      duration
+    ));
+
+    // Log tool calls if any
+    if (chatResponse.toolCalls.length > 0) {
+      console.log(chalk.gray(`    Tool calls: ${chatResponse.toolCalls.map(t => t.name).join(', ')}`));
+    }
+
+    return {
+      result: chatResponse.result,
+      success: chatResponse.success,
+      duration,
+      turns: 1,
+      cost: 0,
+      model: 'internal-agent',
+    };
+  } catch (error) {
+    const duration = timer.stop();
+    const err = error as Error;
+
+    await auditLogger.logError(err, duration, 1);
+    progress.stop();
+
+    console.log(chalk.red(`    内网 Agent 执行失败: ${err.message}`));
+
+    return {
+      error: err.message,
+      errorType: err.constructor.name,
+      prompt: prompt.slice(0, 100) + '...',
+      success: false,
+      duration,
+      cost: 0,
+      retryable: false,
+    };
+  }
 }
 
 // Main entry point for agent execution. Handles retries, git checkpoints, and validation.
