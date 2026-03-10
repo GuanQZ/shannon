@@ -47,23 +47,32 @@ server.setRequestHandler('tools/list', async () => {
 
 // Register tools - tools/call
 server.setRequestHandler('tools/call', async (request) => {
-  const { name, arguments: args } = request.params;
+  try {
+    const { name, arguments: toolArgs } = request.params;
 
-  if (name === 'save_deliverable') {
-    // Actually call existing tool
-    const { createSaveDeliverableTool } = await import('./tools/save-deliverable.js');
-    const handler = createSaveDeliverableTool(targetDir);
-    const result = await handler(args as any);
-    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    if (name === 'save_deliverable') {
+      const { createSaveDeliverableTool, SaveDeliverableInputSchema } = await import('./tools/save-deliverable.js');
+      const validatedArgs = SaveDeliverableInputSchema.parse(toolArgs);
+      const handler = createSaveDeliverableTool(targetDir);
+      const result = await handler(validatedArgs);
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    }
+
+    if (name === 'generate_totp') {
+      const { generateTotp, GenerateTotpInputSchema } = await import('./tools/generate-totp.js');
+      const validatedArgs = GenerateTotpInputSchema.parse(toolArgs);
+      const result = await generateTotp(validatedArgs);
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    }
+
+    throw new Error(`Unknown tool: ${name}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      content: [{ type: 'text', text: JSON.stringify({ status: 'error', message }) }],
+      isError: true,
+    };
   }
-
-  if (name === 'generate_totp') {
-    const { generateTotp } = await import('./tools/generate-totp.js');
-    const result = await generateTotp(args as any);
-    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
-  }
-
-  throw new Error(`Unknown tool: ${name}`);
 });
 
 // Create Express app
@@ -73,9 +82,14 @@ app.use(express.json());
 
 // SSE endpoint
 app.get('/mcp', async (req, res) => {
-  const transport = new SSEServerTransport('/mcp', res);
-  await transport.start();
-  await server.connect(transport);
+  try {
+    const transport = new SSEServerTransport('/mcp', res);
+    await transport.start();
+    await server.connect(transport);
+  } catch (error) {
+    console.error('Error in /mcp endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Start server
