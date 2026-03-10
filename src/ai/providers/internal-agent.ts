@@ -18,7 +18,7 @@
  * - INTERNAL_AGENT_CHAT_*: chat 请求参数
  */
 
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 export interface InternalAgentConfig {
   baseUrl: string;
@@ -138,10 +138,20 @@ async function* parseSSEStream(response: Response): AsyncGenerator<SSEEvent> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let currentEvent = '';
 
   try {
     while (true) {
-      const { done, value } = await reader.read();
+      let done = false;
+      let value: Uint8Array;
+
+      try {
+        const result = await reader.read();
+        done = result.done;
+        value = result.value;
+      } catch (readError) {
+        throw new Error(`Failed to read from stream: ${readError instanceof Error ? readError.message : String(readError)}`);
+      }
 
       if (done) {
         break;
@@ -155,30 +165,39 @@ async function* parseSSEStream(response: Response): AsyncGenerator<SSEEvent> {
         const trimmedLine = line.trim();
 
         if (trimmedLine.startsWith('event:')) {
-          // Wait for data line
+          currentEvent = trimmedLine.slice(5).trim();
           continue;
         }
 
         if (trimmedLine.startsWith('data:')) {
           const data = trimmedLine.slice(5).trim();
 
-          // Get the event type from previous line if available
-          // For simplicity, we yield based on data content
           if (data.startsWith('{')) {
-            let eventType = 'message';
+            let eventType = currentEvent || 'message';
 
-            if (data.includes('"chat_id"')) {
-              eventType = 'chat_started';
-            } else if (data.includes('"code"') && data.includes('"success"')) {
-              eventType = 'done';
+            // Fallback: infer event type from data content if currentEvent is empty
+            if (!currentEvent || currentEvent === 'message') {
+              if (data.includes('"chat_id"')) {
+                eventType = 'chat_started';
+              } else if (data.includes('"code"') && data.includes('"success"')) {
+                eventType = 'done';
+              }
             }
 
             yield { event: eventType, data };
           }
+
+          // Reset currentEvent after yielding
+          currentEvent = '';
         }
       }
     }
   } finally {
+    try {
+      reader.cancel();
+    } catch {
+      // Ignore cancel errors during cleanup
+    }
     reader.releaseLock();
   }
 }
