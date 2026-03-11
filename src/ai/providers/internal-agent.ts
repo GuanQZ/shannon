@@ -42,7 +42,8 @@ export interface InitSessionResponse {
   responseId?: string;
   timestamp?: number;
   data: {
-    session_id: string;
+    session_id?: string;
+    sessionId?: string;
   };
 }
 
@@ -219,15 +220,17 @@ export class InternalAgentClient {
    * 初始化会话，获取 session_id
    */
   async initSession(): Promise<string> {
-    const url = `${this.config.baseUrl}/chatabc/init_session`;
+    const url = `${this.config.baseUrl}/agent-api/${this.config.initSession.agentId}/chatabc/init_session`;
 
     const body = {
       appId: this.config.initSession.appId,
       trCode: this.config.initSession.trCode,
       trVersion: this.config.initSession.trVersion,
       timestamp: Date.now(),
-      agent_id: this.config.initSession.agentId,
       requestId: this.requestId,
+      data: {
+        prompt_variables: [],
+      },
     };
 
     console.log(`[InternalAgent] Calling init_session: ${url}`);
@@ -249,12 +252,18 @@ export class InternalAgentClient {
 
     console.log(`[InternalAgent] init_session response: ${JSON.stringify(data)}`);
 
-    if (data.resCode !== 'FAIAG0000') {
-      throw new Error(`init_session failed with code: ${data.resCode}, message: ${data.resMessage}`);
+    // Lenient check - just log warning if not success, don't fail
+    if (data.resCode && data.resCode !== 'FAIAG0000' && data.resCode !== '0000') {
+      console.warn(`[InternalAgent] init_session returned non-success code: ${data.resCode}, message: ${data.resMessage}`);
     }
 
-    this.sessionId = data.data.session_id;
+    // Support both session_id (snake_case) and sessionId (camelCase)
+    this.sessionId = data.data.session_id || data.data.sessionId || null;
     console.log(`[InternalAgent] Session initialized: ${this.sessionId}`);
+
+    if (!this.sessionId) {
+      throw new Error('Failed to get session_id from init_session response');
+    }
 
     return this.sessionId;
   }
@@ -267,7 +276,7 @@ export class InternalAgentClient {
       throw new Error('Session not initialized. Call initSession() first.');
     }
 
-    const url = `${this.config.baseUrl}/chatabc/chat`;
+    const url = `${this.config.baseUrl}/agent-api/${this.config.initSession.agentId}/chatabc/chat`;
     this.requestId = generateUUID();
 
     const body = {
