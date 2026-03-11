@@ -3,10 +3,12 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import express from 'express';
 import cors from 'cors';
+import { sdkTools } from './tools/sdk-tools.js';
 
 // Get target directory from environment
 const targetRepo = process.env.LUMIN_TARGET_REPO || 'default';
 const targetDir = `/app/deliverables/${targetRepo}`;
+const BASE_DIR = targetDir;
 
 // Create MCP server
 const server = new Server(
@@ -42,6 +44,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['secret'],
         },
       },
+      ...sdkTools.map(tool => ({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+      })),
     ],
   };
 });
@@ -52,9 +59,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: toolArgs } = request.params;
 
     if (name === 'save_deliverable') {
-      const { createSaveDeliverableTool, SaveDeliverableInputSchema } = await import('./tools/save-deliverable.js');
+      const { createSaveDeliverableHandler, SaveDeliverableInputSchema } = await import('./tools/save-deliverable.js');
       const validatedArgs = SaveDeliverableInputSchema.parse(toolArgs);
-      const handler = createSaveDeliverableTool(targetDir);
+      const handler = createSaveDeliverableHandler(targetDir);
       const result = await handler(validatedArgs);
       return { content: [{ type: 'text', text: JSON.stringify(result) }] };
     }
@@ -64,6 +71,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const validatedArgs = GenerateTotpInputSchema.parse(toolArgs);
       const result = await generateTotp(validatedArgs);
       return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    }
+
+    // Handle SDK tools
+    const sdkTool = sdkTools.find(t => t.name === name);
+    if (sdkTool) {
+      const result = await sdkTool.handler(toolArgs || {}, { cwd: BASE_DIR });
+      return { content: [{ type: 'text', text: String(result) }] };
     }
 
     throw new Error(`Unknown tool: ${name}`);
