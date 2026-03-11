@@ -4,3 +4,4 @@ audit-logs/
 dist/
 repos/
 .worktrees/
+.claude/worktrees/
