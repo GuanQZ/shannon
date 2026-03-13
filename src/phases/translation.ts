@@ -13,9 +13,9 @@
 
 import { fs, path } from 'zx';
 import chalk from 'chalk';
-import markdownpdf from 'markdown-pdf';
 import { mdToPdf } from 'md-to-pdf';
 import { PentestError } from '../error-handling.js';
+import { InternalAgentClient, isInternalAgentEnabled } from '../ai/providers/internal-agent.js';
 
 /**
  * Translation configuration
@@ -251,14 +251,49 @@ async function convertMarkdownToPdf(
 }
 
 /**
- * Translate text to Chinese using Claude API
- * 使用 Claude API 将文本翻译为中文
+ * Translate text to Chinese using Claude API or internal agent
+ * 使用 Claude API 或内网 Agent 将文本翻译为中文
  */
 async function translateText(
   config: TranslationConfig,
   text: string,
   model?: string
 ): Promise<string> {
+  // Check if internal agent is enabled - if so, use it for translation
+  if (isInternalAgentEnabled()) {
+    console.log(chalk.gray('  Using internal agent for translation...'));
+    const internalAgent = InternalAgentClient.create();
+
+    if (!internalAgent) {
+      throw new Error('Failed to create internal agent client');
+    }
+
+    try {
+      await internalAgent.initSession();
+
+      const translationPrompt = `You are a professional technical translator. Translate the following English penetration testing report to Simplified Chinese.
+
+IMPORTANT RULES:
+1. Keep all technical terms in English: SQL injection, XSS, SSRF, CVE, payload, endpoint, HTTP, API, JSON, etc.
+2. Keep code blocks, file paths, and URLs unchanged.
+3. Keep vulnerability IDs (like INJ-VULN-001) unchanged.
+4. Translate narrative content to Chinese.
+5. Preserve Markdown formatting.
+
+Translate now:
+
+${text}`;
+
+      // Note: internalAgent.chat() throws on error, so we don't need to check success
+      const chatResponse = await internalAgent.chat(translationPrompt);
+      return chatResponse.result;
+    } catch (error) {
+      console.error('Internal agent translation error:', error);
+      throw error;
+    }
+  }
+
+  // Fall back to direct API call
   // Use the model from parameter, then config, then environment, then fallback
   const modelToUse = model || config.model || 'minimax-m2.5';
   const baseUrl = getBaseUrl(config);

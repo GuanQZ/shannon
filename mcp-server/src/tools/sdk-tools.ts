@@ -31,7 +31,8 @@ export const sdkTools: SDKTool[] = [
       },
       required: ['file_path'],
     },
-    handler: async ({ file_path }: { file_path: string }, context: { cwd: string }) => {
+    handler: async (args: Record<string, unknown>, context: { cwd: string }) => {
+      const file_path = args.file_path as string;
       const fullPath = path.join(context.cwd, file_path);
       const content = await fs.readFile(fullPath, 'utf-8');
       return content;
@@ -47,7 +48,8 @@ export const sdkTools: SDKTool[] = [
       },
       required: ['pattern'],
     },
-    handler: async ({ pattern }: { pattern: string }, context: { cwd: string }) => {
+    handler: async (args: Record<string, unknown>, context: { cwd: string }) => {
+      const pattern = args.pattern as string;
       const files = await glob(pattern, { cwd: context.cwd });
       return JSON.stringify(files);
     },
@@ -63,7 +65,9 @@ export const sdkTools: SDKTool[] = [
       },
       required: ['pattern'],
     },
-    handler: async ({ pattern, path: searchPath }: { pattern: string; path?: string }, context: { cwd: string }) => {
+    handler: async (args: Record<string, unknown>, context: { cwd: string }) => {
+      const pattern = args.pattern as string;
+      const searchPath = args.path as string | undefined;
       const searchDir = searchPath ? path.join(context.cwd, searchPath) : context.cwd;
       try {
         const { stdout } = await execAsync(`rg -n "${pattern}" "${searchDir}" || true`);
@@ -83,7 +87,8 @@ export const sdkTools: SDKTool[] = [
       },
       required: ['command'],
     },
-    handler: async ({ command }: { command: string }, context: { cwd: string }) => {
+    handler: async (args: Record<string, unknown>, context: { cwd: string }) => {
+      const command = args.command as string;
       try {
         const { stdout, stderr } = await execAsync(command, { cwd: context.cwd });
         return stdout || stderr;
@@ -103,7 +108,9 @@ export const sdkTools: SDKTool[] = [
       },
       required: ['file_path', 'content'],
     },
-    handler: async ({ file_path, content }: { file_path: string; content: string }, context: { cwd: string }) => {
+    handler: async (args: Record<string, unknown>, context: { cwd: string }) => {
+      const file_path = args.file_path as string;
+      const content = args.content as string;
       const fullPath = path.join(context.cwd, file_path);
       await fs.mkdir(path.dirname(fullPath), { recursive: true });
       await fs.writeFile(fullPath, content, 'utf-8');

@@ -100,23 +100,16 @@ services:
   mock-server:
     image: node:20-slim
     working_dir: /app
-    command: sh -c "npm install && npm run build && node dist/index.js"
+    command: sh -c "npm install --include=dev && npx tsc && node dist/index.js"
     ports:
       - "3000:3000"
     volumes:
       - ~/.claude/projects/mock-server:/app
     env_file:
       - ~/.claude/projects/mock-server/.env
-    environment:
-      - NODE_ENV=production
-      - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
-      - MINIMAX_BASE_URL=${MINIMAX_BASE_URL:-}
-      - MINIMAX_MODEL=${MINIMAX_MODEL:-}
-      - LUMIN_MCP_SERVER_URL=http://mcp-server:8082/sse
-      - PLAYWRIGHT_MCP_SERVER_URL=http://playwright-mcp:8083/sse
     depends_on:
       mcp-server:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
       interval: 10s
@@ -128,20 +121,35 @@ services:
   mcp-server:
     image: lumin-worker:latest
     working_dir: /app/mcp-server
-    command: node dist/index.js
+    entrypoint: ["node", "dist/http-server.js"]
     ports:
       - "8082:8082"
     volumes:
+      - ./mcp-server/dist:/app/mcp-server/dist
       - lumin-deliverables:/app/deliverables
     environment:
       - PORT=8082
       - NODE_ENV=production
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8082/health"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8082/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 10s
+
+  # Playwright MCP Server for browser automation
+  playwright-mcp:
+    image: lumin-worker:latest
+    working_dir: /app
+    entrypoint: ["playwright-mcp", "--port", "8083", "--host", "0.0.0.0", "--allowed-hosts", "*", "--headless", "--executable-path", "/usr/bin/chromium-browser", "--no-sandbox"]
+    ports:
+      - "8083:8083"
+    volumes:
+      - lumin-deliverables:/app/deliverables
+      - ./repos:/app/repos
+    environment:
+      - NODE_ENV=production
+      - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
 
 volumes:
   temporal-data:

@@ -6,33 +6,26 @@
 FROM cgr.dev/chainguard/wolfi-base:latest AS builder
 
 # Install system dependencies available in Wolfi
-RUN apk update && apk add --no-cache \
-    # Core build tools
-    build-base \
-    git \
-    curl \
-    wget \
-    ca-certificates \
-    # Network libraries for Go tools
-    libpcap-dev \
-    linux-headers \
-    # Language runtimes
-    go \
-    nodejs-22 \
-    npm \
-    python3 \
-    py3-pip \
-    ruby \
-    ruby-dev \
-    # Security tools available in Wolfi
-    nmap \
-    # Additional utilities
-    bash
+# Use BuildKit cache to avoid re-downloading apk packages
+RUN --mount=type=cache,target=/var/cache/apk \
+    apk update && apk add \
+    build-base git curl wget ca-certificates \
+    libpcap-dev linux-headers \
+    go nodejs-22 npm python3 py3-pip ruby ruby-dev \
+    nmap bash
 
 # Set environment variables for Go
 ENV GOPATH=/go
 ENV PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 ENV CGO_ENABLED=1
+# Use Go module proxy for China
+ENV GOPROXY=https://goproxy.cn,direct
+# Use npm mirror for China
+ENV npm_config_registry=https://registry.npmmirror.com
+# Use pip mirror for China
+ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+# Use gem mirror for China
+ENV GEM_SOURCE=https://mirrors.aliyun.com/rubygems/
 
 # Create directories
 RUN mkdir -p $GOPATH/bin
@@ -55,38 +48,14 @@ FROM cgr.dev/chainguard/wolfi-base:latest AS runtime
 
 # Install only runtime dependencies
 USER root
-RUN apk update && apk add --no-cache \
-    # Core utilities
-    git \
-    bash \
-    curl \
-    ca-certificates \
-    # Network libraries (runtime)
-    libpcap \
-    # Security tools
-    nmap \
-    # Language runtimes (minimal)
-    nodejs-22 \
-    npm \
-    python3 \
-    ruby \
-    # Chromium browser and dependencies for Playwright
-    chromium \
-    # Additional libraries Chromium needs
-    nss \
-    freetype \
-    harfbuzz \
-    # X11 libraries for headless browser
-    libx11 \
-    libxcomposite \
-    libxdamage \
-    libxext \
-    libxfixes \
-    libxrandr \
-    mesa-gbm \
-    # Font rendering
-    fontconfig \
-    font-noto-cjk
+# Use BuildKit cache to avoid re-downloading apk packages
+RUN --mount=type=cache,target=/var/cache/apk \
+    apk update && apk add \
+    git bash curl ca-certificates libpcap nmap ripgrep \
+    nodejs-22 npm python3 ruby \
+    chromium nss freetype harfbuzz \
+    libx11 libxcomposite libxdamage libxext libxfixes libxrandr mesa-gbm \
+    fontconfig font-noto-cjk
 
 # Copy Go binaries from builder
 COPY --from=builder /go/bin/subfinder /usr/local/bin/
@@ -115,12 +84,14 @@ COPY mcp-server/package*.json ./mcp-server/
 
 # Install Node.js dependencies (including devDependencies for TypeScript build)
 # Use retry mechanism to handle transient network errors
-RUN set -e; \
+# Use BuildKit cache to avoid re-downloading npm packages
+RUN --mount=type=cache,target=/root/.cache/npm \
+    set -e; \
     max_retries=3; \
     retry_delay=5; \
     for attempt in $(seq 1 $max_retries); do \
         echo "npm ci attempt $attempt of $max_retries"; \
-        if npm ci --prefer-offline --no-audit --loglevel=error; then \
+        if npm ci --no-audit --loglevel=error; then \
             echo "npm ci succeeded"; \
             break; \
         else \
@@ -138,7 +109,7 @@ RUN set -e; \
     retry_delay=5; \
     for attempt in $(seq 1 $max_retries); do \
         echo "mcp-server npm ci attempt $attempt of $max_retries"; \
-        if npm ci --prefer-offline --no-audit --loglevel=error; then \
+        if npm ci --no-audit --loglevel=error; then \
             echo "mcp-server npm ci succeeded"; \
             break; \
         else \
@@ -152,14 +123,17 @@ RUN set -e; \
             fi; \
         fi; \
     done && \
-    cd .. && \
-    npm cache clean --force
+    cd ..
 
 # Copy application source code
 COPY . .
 
 # Build TypeScript (mcp-server first, then main project)
 RUN cd mcp-server && npm run build && cd .. && npm run build
+
+# Pre-install playwright-mcp for offline use
+RUN --mount=type=cache,target=/root/.cache/npm \
+    npm install -g @playwright/mcp@latest
 
 # Remove devDependencies after build to reduce image size
 RUN npm prune --production && \
@@ -182,6 +156,7 @@ ENV NODE_ENV=production
 ENV PATH="/usr/local/bin:$PATH"
 ENV LUMIN_DOCKER=true
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV PUPPETEER_SKIP_DOWNLOAD=1
 ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
 ENV npm_config_cache=/tmp/.npm
 ENV HOME=/tmp
@@ -189,8 +164,8 @@ ENV XDG_CACHE_HOME=/tmp/.cache
 ENV XDG_CONFIG_HOME=/tmp/.config
 
 # Configure Git identity and trust all directories
-RUN git config --global user.email "agent@localhost" && \
-    git config --global user.name "Pentest Agent" && \
+RUN git config --global user.email "Lumin@localhost" && \
+    git config --global user.name "Lumin Agent" && \
     git config --global --add safe.directory '*'
 
 # Set entrypoint

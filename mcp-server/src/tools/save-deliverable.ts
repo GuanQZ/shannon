@@ -115,7 +115,7 @@ function resolveContent(
  * preventing race conditions when multiple workflows run in parallel.
  * 避免并行工作流之间出现目录写入竞态。
  */
-function createSaveDeliverableHandler(targetDir: string) {
+export function createSaveDeliverableHandler(targetDir: string) {
   return async function saveDeliverable(args: SaveDeliverableInput): Promise<ToolResult> {
     try {
       const { deliverable_type } = args;
