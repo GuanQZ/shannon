@@ -166,12 +166,12 @@ async function* parseSSEStream(response: Response): AsyncGenerator<SSEEvent> {
         const trimmedLine = line.trim();
 
         if (trimmedLine.startsWith('event:')) {
-          currentEvent = trimmedLine.slice(5).trim();
+          currentEvent = trimmedLine.slice(6).trim();
           continue;
         }
 
         if (trimmedLine.startsWith('data:')) {
-          const data = trimmedLine.slice(5).trim();
+          const data = trimmedLine.slice(6).trim();
 
           if (data.startsWith('{')) {
             let eventType = currentEvent || 'message';
