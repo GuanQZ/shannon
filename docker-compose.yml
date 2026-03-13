@@ -84,27 +84,6 @@ services:
       retries: 5
       start_period: 30s
 
-  # Mock Internal Agent Server (independent project at ~/.claude/projects/mock-server)
-  mock-server:
-    image: node:20-slim
-    working_dir: /app
-    command: sh -c "npm install --include=dev && npx tsc && node dist/index.js"
-    ports:
-      - "3000:3000"
-    volumes:
-      - ~/.claude/projects/mock-server:/app
-    env_file:
-      - ~/.claude/projects/mock-server/.env
-    depends_on:
-      mcp-server:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
   # MCP Server for tools - use worker image which has mcp-server deps
   mcp-server:
     image: lumin-worker:latest
