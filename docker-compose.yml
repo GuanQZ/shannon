@@ -17,7 +17,7 @@ services:
   worker:
     image: lumin-worker:latest
     entrypoint: >
-      sh -c "PORT=8082 node mcp-server/dist/http-server.js &
+      sh -c "PORT=8082 node lumin-tool-mcp/dist/http-server.js &
              playwright-mcp --port 8083 --host 0.0.0.0 --allowed-hosts '*' --headless --executable-path /usr/bin/chromium-browser --no-sandbox &
              node dist/temporal/worker.js"
     env_file:
@@ -50,8 +50,8 @@ services:
     volumes:
       - ./src:/app/src
       - ./dist:/app/dist
-      - ./mcp-server/src:/app/mcp-server/src
-      - ./mcp-server/dist:/app/mcp-server/dist
+      - ./lumin-tool-mcp/src:/app/lumin-tool-mcp/src
+      - ./lumin-tool-mcp/dist:/app/lumin-tool-mcp/dist
       - ./configs:/app/configs
       - ./prompts:/app/prompts
       - ./audit-logs:/app/audit-logs

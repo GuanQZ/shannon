@@ -36,7 +36,7 @@ import { formatTimestamp } from '../utils/formatting.js';
 import { createGitCheckpoint, commitGitSuccess, rollbackGitWorkspace, getGitCommitHash } from '../utils/git-manager.js';
 import { AGENT_VALIDATORS, MCP_AGENT_MAPPING } from '../constants.js';
 import { AuditSession } from '../audit/index.js';
-import { createLuminHelperServer } from '../../mcp-server/dist/index.js';
+import { createLuminHelperServer } from '../../lumin-tool-mcp/dist/index.js';
 import type { SessionMetadata } from '../audit/utils.js';
 import { getPromptNameForAgent } from '../types/agents.js';
 import type { AgentName } from '../types/index.js';

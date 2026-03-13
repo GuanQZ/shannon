@@ -78,7 +78,7 @@ WORKDIR /app
 
 # Copy package files first for better caching
 COPY package*.json ./
-COPY mcp-server/package*.json ./mcp-server/
+COPY lumin-tool-mcp/package*.json ./lumin-tool-mcp/
 
 # Install Node.js dependencies (including devDependencies for TypeScript build)
 # Use retry mechanism to handle transient network errors
@@ -102,20 +102,20 @@ RUN set -e; \
             fi; \
         fi; \
     done && \
-    cd mcp-server && \
+    cd lumin-tool-mcp && \
     retry_delay=5; \
     for attempt in $(seq 1 $max_retries); do \
-        echo "mcp-server npm ci attempt $attempt of $max_retries"; \
+        echo "lumin-tool-mcp npm ci attempt $attempt of $max_retries"; \
         if npm ci --no-audit --loglevel=error; then \
-            echo "mcp-server npm ci succeeded"; \
+            echo "lumin-tool-mcp npm ci succeeded"; \
             break; \
         else \
             if [ $attempt -lt $max_retries ]; then \
-                echo "mcp-server npm ci failed, retrying in $retry_delay seconds..."; \
+                echo "lumin-tool-mcp npm ci failed, retrying in $retry_delay seconds..."; \
                 sleep $retry_delay; \
                 retry_delay=$((retry_delay * 2)); \
             else \
-                echo "mcp-server npm ci failed after $max_retries attempts"; \
+                echo "lumin-tool-mcp npm ci failed after $max_retries attempts"; \
                 exit 1; \
             fi; \
         fi; \
@@ -125,15 +125,15 @@ RUN set -e; \
 # Copy application source code
 COPY . .
 
-# Build TypeScript (mcp-server first, then main project)
-RUN cd mcp-server && npm run build && cd .. && npm run build
+# Build TypeScript (lumin-tool-mcp first, then main project)
+RUN cd lumin-tool-mcp && npm run build && cd .. && npm run build
 
 # Pre-install playwright-mcp for offline use
 RUN npm install -g @playwright/mcp@latest
 
 # Remove devDependencies after build to reduce image size
 RUN npm prune --production && \
-    cd mcp-server && npm prune --production
+    cd lumin-tool-mcp && npm prune --production
 
 # Create directories for session data and ensure proper permissions
 RUN mkdir -p /app/sessions /app/deliverables /app/repos /app/configs && \

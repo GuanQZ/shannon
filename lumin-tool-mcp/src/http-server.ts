@@ -107,7 +107,7 @@ app.use(express.json());
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', server: 'lumin-mcp-server' });
+  res.json({ status: 'ok', server: 'lumin-tool-mcp' });
 });
 
 // SSE endpoint - MCP standard: GET /sse
