@@ -6,9 +6,8 @@
 FROM cgr.dev/chainguard/wolfi-base:latest AS builder
 
 # Install system dependencies available in Wolfi
-# Use BuildKit cache to avoid re-downloading apk packages
-RUN --mount=type=cache,target=/var/cache/apk \
-    apk update && apk add \
+# Note: Not using BuildKit cache for compatibility with GitHub Actions
+RUN apk update && apk add --no-cache \
     build-base git curl wget ca-certificates \
     libpcap-dev linux-headers \
     go nodejs-22 npm python3 py3-pip ruby ruby-dev \
@@ -48,9 +47,8 @@ FROM cgr.dev/chainguard/wolfi-base:latest AS runtime
 
 # Install only runtime dependencies
 USER root
-# Use BuildKit cache to avoid re-downloading apk packages
-RUN --mount=type=cache,target=/var/cache/apk \
-    apk update && apk add \
+# Note: Not using BuildKit cache for compatibility with GitHub Actions
+RUN apk update && apk add --no-cache \
     git bash curl ca-certificates libpcap nmap ripgrep \
     nodejs-22 npm python3 ruby \
     chromium nss freetype harfbuzz \
@@ -84,9 +82,8 @@ COPY mcp-server/package*.json ./mcp-server/
 
 # Install Node.js dependencies (including devDependencies for TypeScript build)
 # Use retry mechanism to handle transient network errors
-# Use BuildKit cache to avoid re-downloading npm packages
-RUN --mount=type=cache,target=/root/.cache/npm \
-    set -e; \
+# Note: Not using BuildKit cache for compatibility with GitHub Actions
+RUN set -e; \
     max_retries=3; \
     retry_delay=5; \
     for attempt in $(seq 1 $max_retries); do \
@@ -132,8 +129,7 @@ COPY . .
 RUN cd mcp-server && npm run build && cd .. && npm run build
 
 # Pre-install playwright-mcp for offline use
-RUN --mount=type=cache,target=/root/.cache/npm \
-    npm install -g @playwright/mcp@latest
+RUN npm install -g @playwright/mcp@latest
 
 # Remove devDependencies after build to reduce image size
 RUN npm prune --production && \
