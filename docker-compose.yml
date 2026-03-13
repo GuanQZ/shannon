@@ -15,17 +15,20 @@ services:
       start_period: 30s
 
   worker:
-    build: .
-    entrypoint: ["node", "dist/temporal/worker.js"]
+    image: lumin-worker:latest
+    entrypoint: >
+      sh -c "node dist/mcp-server/http-server.js &
+             playwright-mcp --port 8083 --host 0.0.0.0 --allowed-hosts '*' --headless --executable-path /usr/bin/chromium-browser --no-sandbox &
+             node dist/temporal/worker.js"
     env_file:
       - .env
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-}  # Optional: route through claude-code-router
+      - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-}
-      - ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN:-}  # Auth token for router
-      - ROUTER_DEFAULT=${ROUTER_DEFAULT:-}  # Model name when using router (e.g., "gemini,gemini-2.5-pro")
+      - ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN:-}
+      - ROUTER_DEFAULT=${ROUTER_DEFAULT:-}
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
       - INTERNAL_AGENT_BASE_URL=${INTERNAL_AGENT_BASE_URL:-}
       - INTERNAL_AGENT_INIT_SESSION_APP_ID=${INTERNAL_AGENT_INIT_SESSION_APP_ID:-}
@@ -36,6 +39,11 @@ services:
       - INTERNAL_AGENT_CHAT_TR_CODE=${INTERNAL_AGENT_CHAT_TR_CODE:-}
       - INTERNAL_AGENT_CHAT_TR_VERSION=${INTERNAL_AGENT_CHAT_TR_VERSION:-}
       - INTERNAL_AGENT_CHAT_STREAM=${INTERNAL_AGENT_CHAT_STREAM:-}
+      - NODE_ENV=production
+      - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
+    ports:
+      - "8082:8082"   # lumin-tool-mcp (MCP server for tools)
+      - "8083:8083"   # playwright-mcp (browser automation)
     depends_on:
       temporal:
         condition: service_healthy
@@ -48,18 +56,25 @@ services:
       - ./prompts:/app/prompts
       - ./audit-logs:/app/audit-logs
       - ${OUTPUT_DIR:-./audit-logs}:/app/output
-      - ./repos:/repos
+      - ./repos:/app/repos
       - ${BENCHMARKS_BASE:-.}:/benchmarks
+      - lumin-deliverables:/app/deliverables
     shm_size: 2gb
     ipc: host
     security_opt:
       - seccomp:unconfined
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8082/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Optional: claude-code-router for multi-model support
   # Start with: ROUTER=true ./lumin start ...
   router:
     image: node:20-slim
-    profiles: ["router"]  # Only starts when explicitly requested
+    profiles: ["router"]
     command: >
       sh -c "apt-get update && apt-get install -y gettext-base &&
              npm install -g @musistudio/claude-code-router &&
@@ -83,40 +98,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-
-  # MCP Server for tools - use worker image which has mcp-server deps
-  mcp-server:
-    image: lumin-worker:latest
-    working_dir: /app/mcp-server
-    entrypoint: ["node", "dist/http-server.js"]
-    ports:
-      - "8082:8082"
-    volumes:
-      - ./mcp-server/dist:/app/mcp-server/dist
-      - lumin-deliverables:/app/deliverables
-    environment:
-      - PORT=8082
-      - NODE_ENV=production
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8082/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  # Playwright MCP Server for browser automation
-  playwright-mcp:
-    image: lumin-worker:latest
-    working_dir: /app
-    entrypoint: ["playwright-mcp", "--port", "8083", "--host", "0.0.0.0", "--allowed-hosts", "*", "--headless", "--executable-path", "/usr/bin/chromium-browser", "--no-sandbox"]
-    ports:
-      - "8083:8083"
-    volumes:
-      - lumin-deliverables:/app/deliverables
-      - ./repos:/app/repos
-    environment:
-      - NODE_ENV=production
-      - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
 
 volumes:
   temporal-data:
