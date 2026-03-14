@@ -11,7 +11,7 @@ RUN apk update && apk add --no-cache \
     build-base git curl wget ca-certificates \
     libpcap-dev linux-headers \
     go nodejs-22 npm python3 py3-pip ruby ruby-dev \
-    nmap bash sh
+    nmap bash
 
 # Set environment variables for Go
 ENV GOPATH=/go
