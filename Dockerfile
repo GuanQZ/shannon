@@ -11,20 +11,14 @@ RUN apk update && apk add --no-cache \
     build-base git curl wget ca-certificates \
     libpcap-dev linux-headers \
     go nodejs-22 npm python3 py3-pip ruby ruby-dev \
-    nmap bash
+    nmap bash sh
 
 # Set environment variables for Go
 ENV GOPATH=/go
 ENV PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 ENV CGO_ENABLED=1
-# Use Go module proxy for China
-ENV GOPROXY=https://goproxy.cn,direct
-# Use npm mirror for China
-ENV npm_config_registry=https://registry.npmmirror.com
-# Use pip mirror for China
-ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
-# Use gem mirror for China
-ENV GEM_SOURCE=https://mirrors.aliyun.com/rubygems/
+# Use official Go module proxy
+ENV GOPROXY=https://proxy.golang.org,direct
 
 # Create directories
 RUN mkdir -p $GOPATH/bin
