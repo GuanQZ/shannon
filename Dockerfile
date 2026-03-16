@@ -17,8 +17,8 @@ RUN apk update && apk add --no-cache \
 ENV GOPATH=/go
 ENV PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 ENV CGO_ENABLED=1
-# Use official Go module proxy
-ENV GOPROXY=https://proxy.golang.org,direct
+# Use China mirror for Go modules
+ENV GOPROXY=https://goproxy.cn,direct
 
 # Create directories
 RUN mkdir -p $GOPATH/bin
@@ -26,15 +26,21 @@ RUN mkdir -p $GOPATH/bin
 # Install Go-based security tools
 RUN go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
 # Install WhatWeb from GitHub (Ruby-based tool)
-RUN git clone --depth 1 https://github.com/urbanadventurer/WhatWeb.git /opt/whatweb && \
+# Use China mirror for Ruby gems, fallback to official
+# Use GitHub mirror for faster clone in China
+RUN gem sources --add https://gems.ruby-china.com/ --remove https://rubygems.org/ || true && \
+    git clone --depth 1 https://hub.fastgit.xyz/urbanadventurer/WhatWeb.git /opt/whatweb || \
+    git clone --depth 1 https://github.com/urbanadventurer/WhatWeb.git /opt/whatweb && \
     chmod +x /opt/whatweb/whatweb && \
-    gem install addressable && \
+    gem install addressable --source https://gems.ruby-china.com/ || gem install addressable && \
     echo '#!/bin/bash' > /usr/local/bin/whatweb && \
     echo 'cd /opt/whatweb && exec ./whatweb "$@"' >> /usr/local/bin/whatweb && \
     chmod +x /usr/local/bin/whatweb
 
 # Install Python-based tools
-RUN pip3 install --no-cache-dir schemathesis
+# Use China mirror for pip
+RUN pip3 config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && \
+    pip3 install --no-cache-dir schemathesis
 
 # Runtime stage - Minimal production image
 FROM cgr.dev/chainguard/wolfi-base:latest AS runtime
@@ -57,7 +63,9 @@ COPY --from=builder /opt/whatweb /opt/whatweb
 COPY --from=builder /usr/local/bin/whatweb /usr/local/bin/whatweb
 
 # Install WhatWeb Ruby dependencies in runtime stage
-RUN gem install addressable
+# Use China mirror for Ruby gems, fallback to official
+RUN gem sources --add https://gems.ruby-china.com/ --remove https://rubygems.org/ || true && \
+    gem install addressable --source https://gems.ruby-china.com/ || gem install addressable
 
 # Copy Python packages from builder
 COPY --from=builder /usr/lib/python3.*/site-packages /usr/lib/python3.12/site-packages
@@ -75,9 +83,9 @@ COPY package*.json ./
 COPY lumin-tool-mcp/package*.json ./lumin-tool-mcp/
 
 # Install Node.js dependencies (including devDependencies for TypeScript build)
-# Use retry mechanism to handle transient network errors
-# Note: Not using BuildKit cache for compatibility with GitHub Actions
-RUN set -e; \
+# Use official npm registry (npmmirror has missing packages)
+RUN npm config set registry https://registry.npmjs.org && \
+    set -e; \
     max_retries=3; \
     retry_delay=5; \
     for attempt in $(seq 1 $max_retries); do \
@@ -123,7 +131,8 @@ COPY . .
 RUN cd lumin-tool-mcp && npm run build && cd .. && npm run build
 
 # Pre-install playwright-mcp for offline use
-RUN npm install -g @playwright/mcp@latest
+RUN npm config set registry https://registry.npmjs.org && \
+    npm install -g @playwright/mcp@latest
 
 # Remove devDependencies after build to reduce image size
 RUN npm prune --production && \

@@ -28,6 +28,7 @@ import {
   type SessionMetadata,
 } from './utils.js';
 import { atomicWrite } from '../utils/file-io.js';
+import { InternalAgentClient, isInternalAgentEnabled } from '../ai/providers/internal-agent.js';
 import { formatTimestamp } from '../utils/formatting.js';
 
 interface LogEvent {
@@ -95,7 +96,7 @@ function extractDisplayContent(eventType: string, eventData: unknown): string | 
   return null;
 }
 
-// Translate text to Chinese using AI API
+// Translate text to Chinese using internal agent (chat method only)
 async function translateToChinese(text: string): Promise<string> {
   // Skip if already contains Chinese
   const chineseRegex = /[\u4e00-\u9fa5]/;
@@ -103,44 +104,38 @@ async function translateToChinese(text: string): Promise<string> {
     return text;
   }
 
-  // Get API key from environment
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  const baseUrl = process.env.ANTHROPIC_BASE_URL || 'https://api.minimaxi.com/anthropic';
-  const model = process.env.ANTHROPIC_MODEL || 'minimax-m2.5';
+  // Use internal agent via chat
+  if (isInternalAgentEnabled()) {
+    const internalAgent = InternalAgentClient.create();
+    if (!internalAgent) {
+      console.warn('[Chinese Translation] Failed to create internal agent client, skipping translation');
+      return text;
+    }
 
-  if (!apiKey) {
-    console.warn('ANTHROPIC_API_KEY not set, skipping translation');
-    return text;
+    try {
+      await internalAgent.initSession();
+
+      const prompt = `Translate to Simplified Chinese. Keep technical terms (CVEs, payloads, endpoints, HTTP methods, file paths, code) in English. Output ONLY the translation:
+
+${text}`;
+
+      const response = await internalAgent.chat(prompt);
+      if (response.success && response.result) {
+        console.log('[Chinese Translation] Translated:', text.substring(0, 50), '->', response.result.substring(0, 50));
+        return response.result;
+      } else {
+        console.warn('[Chinese Translation] Chat failed or no result, skipping translation');
+        return text;
+      }
+    } catch (error) {
+      console.error('[Chinese Translation] Error:', error);
+      return text;
+    }
   }
 
-  try {
-    const response = await fetch(`${baseUrl}/v1/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: model,
-        max_tokens: 1024,
-        system: 'You are a translator. Translate the text to Simplified Chinese ONLY. Output ONLY the translation, no original text, no explanations. Keep technical terms (CVEs, payloads, endpoints, HTTP methods, file paths, code) in English. Do not include any prefix like [agent] or labels.',
-        messages: [{ role: 'user', content: text }]
-      })
-    });
-
-    const data = await response.json() as {
-      content?: Array<{ type?: string; text?: string; thinking?: string }>
-    };
-    // Find the text content (skip thinking type)
-    const textContent = data.content?.find(c => c.type === 'text');
-    const result = textContent?.text || text;
-    console.log('[Chinese Translation] Translated:', text.substring(0, 50), '->', result.substring(0, 50));
-    return result;
-  } catch (e) {
-    console.error('Translation error:', e);
-    return text;
-  }
+  // No fallback - if internal agent is not configured, return original text
+  console.warn('[Chinese Translation] Internal agent not enabled, skipping translation');
+  return text;
 }
 
 /**

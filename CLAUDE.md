@@ -3,6 +3,8 @@
 ## Tool Preferences
 
 - **搜索互联网**: 必须使用 `mcp__minimax__web_search` 工具，不要使用 `WebSearch`（后者需要 Anthropic API，在此环境中不可用）
+- **Docker 构建**: 默认使用 buildx（已设置为默认），不要加 `--no-cache`，否则会清掉缓存
+  - 构建命令：`docker build -t <image-name> .`
 
 AI-powered penetration testing agent for defensive security analysis. Automates vulnerability assessment by combining reconnaissance tools with AI-powered code analysis.
 
@@ -14,11 +16,15 @@ AI-powered penetration testing agent for defensive security analysis. Automates 
 # Setup
 cp .env.example .env && edit .env  # Set ANTHROPIC_API_KEY
 
-# Prepare repo (REPO is a folder name inside ./repos/, not an absolute path)
+# Prepare repo (supports 3 formats):
+# 1. GitHub URL: https://github.com/org/repo.git
+# 2. Folder name inside ./repos/: my-repo
+# 3. Absolute path: /path/to/repo
 git clone https://github.com/org/repo.git ./repos/my-repo
 # or symlink: ln -s /path/to/existing/repo ./repos/my-repo
 
 # Run
+./lumin start URL=<url> REPO=https://github.com/org/repo.git
 ./lumin start URL=<url> REPO=my-repo
 ./lumin start URL=<url> REPO=my-repo CONFIG=./configs/my-config.yaml
 
@@ -128,6 +134,8 @@ Defensive security tool only. Use only on systems you own or have explicit permi
 
 ## Troubleshooting
 
+- **启动新渗透任务前** — 必须先停止旧任务: `./lumin stop`，避免多个工作流同时运行消耗 token，重启服务后等待mock和lumin的mcp完成链接后再开始渗透任务。
+- **不要重新构建 lumin** — 只修改 mock-server，只重建 mock-server 镜像
 - **"Repository not found"** — `REPO` must be a folder name inside `./repos/`, not an absolute path. Clone or symlink your repo there first: `ln -s /path/to/repo ./repos/my-repo`
 - **"Temporal not ready"** — Wait for health check or `docker compose logs temporal`
 - **Worker not processing** — Check `docker compose ps`

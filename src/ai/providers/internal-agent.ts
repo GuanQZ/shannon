@@ -73,6 +73,25 @@ export interface SSEEvent {
   data: string;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  toolCalls?: Array<{
+    name: string;
+    args: Record<string, unknown>;
+    id: string;
+  }>;
+  // Dashboard-compatible format for tool_use/tool_result
+  toolUse?: {
+    name: string;
+    input: Record<string, unknown>;
+  };
+  toolResult?: {
+    name: string;
+    output: string;
+  };
+}
+
 export interface ChatResponse {
   result: string;
   toolCalls: Array<{
@@ -80,6 +99,7 @@ export interface ChatResponse {
     args: Record<string, unknown>;
     id: string;
   }>;
+  messages: ChatMessage[];  // All messages for audit logging
   success: boolean;
   chatId?: string | undefined;
 }
@@ -311,14 +331,16 @@ export class InternalAgentClient {
     // Parse SSE stream
     let result = '';
     const toolCalls: Array<{ name: string; args: Record<string, unknown>; id: string }> = [];
+    const messages: ChatMessage[] = [];  // For audit logging with tool_use/tool_result format
     let chatId: string | undefined;
     let success = false;
 
     try {
       for await (const event of parseSSEStream(response)) {
         const eventData = JSON.parse(event.data);
+        const msgType = eventData.type;
 
-        console.log(`[InternalAgent] SSE event: ${event.event}`);
+        console.log(`[InternalAgent] SSE event: ${event.event}, type: ${msgType}`);
 
         if (event.event === 'chat_started') {
           const startedEvent = eventData as ChatStartedEvent;
@@ -327,31 +349,73 @@ export class InternalAgentClient {
         }
 
         if (event.event === 'message') {
-          const message = eventData as ChatMessageEvent;
-
-          // Log tool calls
-          if (message.tool_calls && message.tool_calls.length > 0) {
-            for (const toolCall of message.tool_calls) {
-              console.log(`[InternalAgent] Tool call: ${toolCall.name}`);
-
-              let args: Record<string, unknown> = {};
-              try {
-                args = JSON.parse(toolCall.args);
-              } catch {
-                args = { raw: toolCall.args };
-              }
-
-              toolCalls.push({
-                name: toolCall.name,
-                args,
-                id: toolCall.id,
-              });
+          // Handle AIMessageChunk (can have both text content AND tool_calls)
+          if (msgType === 'AIMessageChunk') {
+            // First, log any text content as regular response
+            if (eventData.content) {
+              result += eventData.content;
             }
-          }
 
-          // Accumulate text content
-          if (message.content) {
-            result += message.content;
+            // Then, log tool_calls separately if present
+            if (eventData.tool_calls && eventData.tool_calls.length > 0) {
+              for (const toolCall of eventData.tool_calls) {
+                console.log(`[InternalAgent] Tool call: ${toolCall.name}`);
+
+                let args: Record<string, unknown> = {};
+                try {
+                  args = JSON.parse(toolCall.args);
+                } catch {
+                  args = { raw: toolCall.args };
+                }
+
+                toolCalls.push({
+                  name: toolCall.name,
+                  args,
+                  id: toolCall.id,
+                });
+
+                // Add tool_use message for audit logging (dashboard format)
+                messages.push({
+                  role: 'assistant',
+                  content: JSON.stringify({
+                    type: 'tool_use',
+                    id: toolCall.id,
+                    name: toolCall.name,
+                    input: args,
+                  }),
+                  toolUse: {
+                    name: toolCall.name,
+                    input: args,
+                  },
+                });
+              }
+            }
+          } else if (msgType === 'function') {
+            // Tool result - may or may not have name field
+            const toolName = eventData.name || 'unknown';
+            const toolOutput = typeof eventData.content === 'string'
+              ? eventData.content
+              : JSON.stringify(eventData.content);
+
+            console.log(`[InternalAgent] Tool result: ${toolName}, hasName: ${!!eventData.name}`);
+
+            messages.push({
+              role: 'user',
+              content: JSON.stringify({
+                type: 'tool_result',
+                name: toolName,
+                output: toolOutput,
+              }),
+              toolResult: {
+                name: toolName,
+                output: toolOutput,
+              },
+            });
+          } else {
+            // Regular text content (non-AIMessageChunk)
+            if (eventData.content) {
+              result += eventData.content;
+            }
           }
         }
 
@@ -372,9 +436,18 @@ export class InternalAgentClient {
       result = `[Tool calls executed: ${toolCalls.map(t => t.name).join(', ')}]`;
     }
 
+    // Add final assistant message with text content (if any)
+    if (result) {
+      messages.push({
+        role: 'assistant',
+        content: result,
+      });
+    }
+
     return {
       result,
       toolCalls,
+      messages,
       success,
       chatId,
     };

@@ -145,7 +145,8 @@ function addToolLog(log) {
   } else if (content.includes('"type":"tool_result"')) {
     try {
       const parsed = JSON.parse(content);
-      displayContent = `✅ 工具结果: ${(parsed.output || '').substring(0, 200)}`;
+      const toolName = parsed.name || 'unknown';
+      displayContent = `✅ 工具结果 (${toolName}): ${(parsed.output || '').substring(0, 200)}`;
     } catch {}
   }
 

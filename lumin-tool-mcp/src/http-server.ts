@@ -3,14 +3,19 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import express from 'express';
 import cors from 'cors';
+import { sdkTools } from './tools/sdk-tools.js';
 
-// Get target directory from environment
-const targetRepo = process.env.LUMIN_TARGET_REPO || 'default';
-const targetDir = `/app/deliverables/${targetRepo}`;
-const BASE_DIR = targetDir;
+// Get target directory from environment - support dynamic update via /set-cwd API
+// Default to /app/repos/ as the base for target repos
+let BASE_DIR = process.env.LUMIN_TARGET_REPO
+  ? `/app/repos/${process.env.LUMIN_TARGET_REPO}`
+  : '/app/repos/lumin-target';
 
 // Store active server-transport pairs by session ID
 const sessions = new Map<string, { server: Server; transport: SSEServerTransport }>();
+
+// Filter SDK tools: exclude Bash and Write (only keep Read, Glob, Grep)
+const allowedSdkToolNames = ['Read', 'Glob', 'Grep'];
 
 /**
  * Create a new MCP server instance with all tools registered.
@@ -24,39 +29,45 @@ function createMcpServer(): Server {
 
   // Register tools - tools/list
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const { sdkTools } = await import('./tools/sdk-tools.js');
+    // Custom tools
+    const customTools = [
+      {
+        name: 'save_deliverable',
+        description: 'Saves deliverable files with automatic validation.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            deliverable_type: { type: 'string' },
+            content: { type: 'string' },
+            file_path: { type: 'string' },
+          },
+          required: ['deliverable_type'],
+        },
+      },
+      {
+        name: 'generate_totp',
+        description: 'Generates 6-digit TOTP code for authentication.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            secret: { type: 'string' },
+          },
+          required: ['secret'],
+        },
+      },
+    ];
+
+    // Filter SDK tools (exclude Bash and Write)
+    const filteredSdkTools = sdkTools
+      .filter(tool => allowedSdkToolNames.includes(tool.name))
+      .map(tool => ({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+      }));
+
     return {
-      tools: [
-        {
-          name: 'save_deliverable',
-          description: 'Saves deliverable files with automatic validation.',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              deliverable_type: { type: 'string' },
-              content: { type: 'string' },
-              file_path: { type: 'string' },
-            },
-            required: ['deliverable_type'],
-          },
-        },
-        {
-          name: 'generate_totp',
-          description: 'Generates 6-digit TOTP code for authentication.',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              secret: { type: 'string' },
-            },
-            required: ['secret'],
-          },
-        },
-        ...sdkTools.map(tool => ({
-          name: tool.name,
-          description: tool.description,
-          inputSchema: tool.inputSchema,
-        })),
-      ],
+      tools: [...customTools, ...filteredSdkTools],
     };
   });
 
@@ -64,30 +75,33 @@ function createMcpServer(): Server {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
       const { name, arguments: toolArgs } = request.params;
+      const toolName = name;
 
-      if (name === 'save_deliverable') {
+      // Custom tools
+      if (toolName === 'save_deliverable') {
         const { createSaveDeliverableHandler, SaveDeliverableInputSchema } = await import('./tools/save-deliverable.js');
         const validatedArgs = SaveDeliverableInputSchema.parse(toolArgs);
-        const handler = createSaveDeliverableHandler(targetDir);
+        const handler = createSaveDeliverableHandler(BASE_DIR);
         const result = await handler(validatedArgs);
         return { content: [{ type: 'text', text: JSON.stringify(result) }] };
       }
 
-      if (name === 'generate_totp') {
+      if (toolName === 'generate_totp') {
         const { generateTotp, GenerateTotpInputSchema } = await import('./tools/generate-totp.js');
         const validatedArgs = GenerateTotpInputSchema.parse(toolArgs);
         const result = await generateTotp(validatedArgs);
         return { content: [{ type: 'text', text: JSON.stringify(result) }] };
       }
 
-      const { sdkTools } = await import('./tools/sdk-tools.js');
-      const sdkTool = sdkTools.find(t => t.name === name);
+      // SDK tools - find matching tool and execute
+      const sdkTool = sdkTools.find(t => t.name === toolName);
       if (sdkTool) {
-        const result = await sdkTool.handler(toolArgs || {}, { cwd: BASE_DIR });
-        return { content: [{ type: 'text', text: String(result) }] };
+        const args = toolArgs || {};
+        const result = await sdkTool.handler(args, { cwd: BASE_DIR });
+        return { content: [{ type: 'text', text: typeof result === 'string' ? result : JSON.stringify(result) }] };
       }
 
-      throw new Error(`Unknown tool: ${name}`);
+      throw new Error(`Unknown tool: ${toolName}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return {
@@ -108,6 +122,17 @@ app.use(express.json());
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', server: 'lumin-tool-mcp' });
+});
+
+// Set working directory endpoint - allows dynamic update of BASE_DIR
+app.put('/set-cwd', (req, res) => {
+  const { cwd } = req.body;
+  if (!cwd || typeof cwd !== 'string') {
+    return res.status(400).json({ error: 'cwd is required and must be a string' });
+  }
+  BASE_DIR = cwd;
+  console.log(`Working directory updated to: ${BASE_DIR}`);
+  res.json({ status: 'ok', cwd: BASE_DIR });
 });
 
 // SSE endpoint - MCP standard: GET /sse
@@ -208,11 +233,32 @@ app.post('/messages', express.json(), async (req, res) => {
   }
 });
 
+// Create /bin/sh symlink if not exists (Node.js exec requires it)
+import { existsSync, symlinkSync } from 'fs';
+import { dirname } from 'path';
+try {
+  const binSh = '/bin/sh';
+  const usrBinSh = '/usr/bin/sh';
+  if (!existsSync(binSh) && existsSync(usrBinSh)) {
+    // Create parent directory if needed
+    const binDir = dirname(binSh);
+    if (!existsSync(binDir)) {
+      // Can't create /bin, skip
+      console.log('Note: /bin does not exist, skipping /bin/sh symlink');
+    } else {
+      symlinkSync(usrBinSh, binSh);
+      console.log('Created /bin/sh symlink');
+    }
+  }
+} catch (e) {
+  console.log('Note: Could not create /bin/sh symlink:', e);
+}
+
 // Start server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`Lumin MCP Server running on port ${PORT}`);
-  console.log(`Target directory: ${targetDir}`);
+  console.log(`Target directory: ${BASE_DIR}`);
 });
 
 export { app };

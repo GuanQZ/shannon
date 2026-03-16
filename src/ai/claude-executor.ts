@@ -498,8 +498,11 @@ async function runInternalAgentPrompt(
     // Initialize session
     await internalAgent.initSession();
 
+    // Prepend working directory info to prompt so LLM knows where the source code is
+    const promptWithWorkingDir = `注意：目标源代码仓库位于工作目录: ${sourceDir}\n所有文件操作都在此目录下进行。\n\n---\n\n${prompt}`;
+
     // Send chat request
-    const chatResponse = await internalAgent.chat(prompt);
+    const chatResponse = await internalAgent.chat(promptWithWorkingDir);
 
     const duration = timer.stop();
     timingResults.agents[`internal-agent-${description.toLowerCase().replace(/\s+/g, '-')}`] = duration;
@@ -517,6 +520,20 @@ async function runInternalAgentPrompt(
       1,
       duration
     ));
+
+    // Log tool calls and results to audit log (for dashboard compatibility)
+    // The messages array contains tool_use and tool_result in dashboard-expected format
+    if (chatResponse.messages && chatResponse.messages.length > 0) {
+      for (const message of chatResponse.messages) {
+        // Log tool_use and tool_result messages
+        if (message.toolUse || message.toolResult) {
+          await auditLogger.logLlmResponse(1, message.content);
+        } else if (message.content && message.content.trim()) {
+          // Log regular text content as well
+          await auditLogger.logLlmResponse(1, message.content);
+        }
+      }
+    }
 
     // Log tool calls if any
     if (chatResponse.toolCalls.length > 0) {

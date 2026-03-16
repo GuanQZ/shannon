@@ -399,7 +399,7 @@ function initFilePositions() {
             const content = fs.readFileSync(filePath, 'utf8');
             const lines = content.split('\n').filter(line => line.trim());
             chineseLogTimestamps.set(filePath, fs.statSync(filePath).mtimeMs);
-            filePositions.set(filePath, lines.length);  // 初始化为行数
+            filePositions.set(filePath, 0);  // 初始化为0，启动后读取所有现有日志
           });
         }
       }

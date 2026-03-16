@@ -203,7 +203,7 @@ cmd_start() {
   if [ "$REPO_COUNT" -gt 1 ] || ( [ -n "$REPOS" ] && is_git_url "$REPO_LIST" ); then
     mkdir -p ./repos
     JOB_ID="lumin-$(date +%Y%m%d-%H%M%S)-$RANDOM"
-    CLONE_BASE="./repos/$JOB_ID"
+    CLONE_BASE="repos/$JOB_ID"
     mkdir -p "$CLONE_BASE"
 
     echo "Cloning $REPO_COUNT repositories into isolated workspace: $CLONE_BASE"
@@ -247,7 +247,7 @@ cmd_start() {
       echo "Safe mode: git push URLs disabled for isolated workspace"
     fi
 
-    CONTAINER_REPO="$CLONE_BASE"
+    CONTAINER_REPO="/app/$CLONE_BASE"
     export REPOS="$REPOS"  # Pass REPOS to container for multi-repo mode
   else
     # Single local repo (backward compatible)
@@ -267,7 +267,7 @@ cmd_start() {
         echo "Safe mode: git push URL disabled for isolated workspace"
       fi
 
-      CONTAINER_REPO="/repos/$JOB_ID"
+      CONTAINER_REPO="/app/repos/$JOB_ID"
     else
       case "$repo_item" in
       /benchmarks/*|/repos/*)
@@ -280,7 +280,7 @@ cmd_start() {
           echo "Place your target repository under the ./repos/ directory"
           exit 1
         fi
-        CONTAINER_REPO="/repos/$repo_item"
+        CONTAINER_REPO="/app/repos/$repo_item"
         ;;
       esac
 
@@ -292,6 +292,10 @@ cmd_start() {
       fi
     fi
   fi
+
+  # Extract local repo path from CONTAINER_REPO for local file operations
+  # Remove /app prefix and add ./ for local path (e.g., /app/repos/xxx -> ./repos/xxx)
+  LOCAL_REPO_PATH="./${CONTAINER_REPO#/app}"
 
   if [ "$LUMIN_DISABLE_GIT_WRITES" = "true" ]; then
     echo "Safe mode: local git checkpoint/rollback/commit is disabled"
@@ -338,9 +342,10 @@ cmd_start() {
   chmod 777 ./audit-logs
 
   # Ensure repo deliverables directory is writable by container user (UID 1001)
-  if [ -d "./repos/$REPO" ]; then
-    mkdir -p "./repos/$REPO/deliverables"
-    chmod 777 "./repos/$REPO/deliverables"
+  # Use LOCAL_REPO_PATH which is derived from CONTAINER_REPO (works for both local repos and git URLs)
+  if [ -n "$LOCAL_REPO_PATH" ]; then
+    mkdir -p "$LOCAL_REPO_PATH/deliverables"
+    chmod 777 "$LOCAL_REPO_PATH/deliverables"
   fi
 
   # Ensure containers are running (starts them if needed)
@@ -361,6 +366,15 @@ cmd_start() {
   # Pass REPOS if multiple repositories
   if [ -n "$REPOS" ]; then
     ARGS="$ARGS --repos $REPOS"
+  fi
+
+  # Set MCP working directory before starting workflow
+  # Use CONTAINER_REPO directly (e.g., /app/repos/lumin-target)
+  if [ -n "$CONTAINER_REPO" ]; then
+    echo "Setting MCP working directory to: $CONTAINER_REPO"
+    curl -s -X PUT http://localhost:8082/set-cwd \
+      -H "Content-Type: application/json" \
+      -d "{\"cwd\": \"$CONTAINER_REPO\"}" > /dev/null || true
   fi
 
   # Run the client to submit workflow

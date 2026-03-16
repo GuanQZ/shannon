@@ -1,10 +1,34 @@
 import { glob } from 'glob';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
 
 const execAsync = promisify(exec);
+
+// Execute command using spawn (more reliable than exec for shell commands)
+function execCommand(command: string, cwd: string): Promise<string> {
+  return new Promise((resolve) => {
+    const child = spawn('/bin/sh', ['-c', command], {
+      cwd,
+      env: { ...process.env, HOME: process.env.HOME || '/tmp' }
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (data) => { stdout += data; });
+    child.stderr.on('data', (data) => { stderr += data; });
+
+    child.on('close', (code) => {
+      resolve(stdout || stderr || `Process exited with code ${code}`);
+    });
+
+    child.on('error', (err) => {
+      resolve(`Error: ${err.message}`);
+    });
+  });
+}
 
 export interface SDKTool {
   name: string;
@@ -90,8 +114,8 @@ export const sdkTools: SDKTool[] = [
     handler: async (args: Record<string, unknown>, context: { cwd: string }) => {
       const command = args.command as string;
       try {
-        const { stdout, stderr } = await execAsync(command, { cwd: context.cwd });
-        return stdout || stderr;
+        // Use spawn for more reliable shell execution
+        return await execCommand(command, context.cwd);
       } catch (error: unknown) {
         return `Error: ${error instanceof Error ? error.message : String(error)}`;
       }
