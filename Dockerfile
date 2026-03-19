@@ -26,13 +26,10 @@ RUN mkdir -p $GOPATH/bin
 # Install Go-based security tools
 RUN go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
 # Install WhatWeb from GitHub (Ruby-based tool)
-# Use China mirror for Ruby gems, fallback to official
-# Use GitHub mirror for faster clone in China
-RUN gem sources --add https://gems.ruby-china.com/ --remove https://rubygems.org/ || true && \
-    git clone --depth 1 https://hub.fastgit.xyz/urbanadventurer/WhatWeb.git /opt/whatweb || \
-    git clone --depth 1 https://github.com/urbanadventurer/WhatWeb.git /opt/whatweb && \
+# Use full clone instead of --depth 1 to get complete files
+RUN git clone --recursive https://github.com/urbanadventurer/WhatWeb.git /opt/whatweb && \
     chmod +x /opt/whatweb/whatweb && \
-    gem install addressable --source https://gems.ruby-china.com/ || gem install addressable && \
+    gem install addressable && \
     echo '#!/bin/bash' > /usr/local/bin/whatweb && \
     echo 'cd /opt/whatweb && exec ./whatweb "$@"' >> /usr/local/bin/whatweb && \
     chmod +x /usr/local/bin/whatweb
@@ -63,9 +60,7 @@ COPY --from=builder /opt/whatweb /opt/whatweb
 COPY --from=builder /usr/local/bin/whatweb /usr/local/bin/whatweb
 
 # Install WhatWeb Ruby dependencies in runtime stage
-# Use China mirror for Ruby gems, fallback to official
-RUN gem sources --add https://gems.ruby-china.com/ --remove https://rubygems.org/ || true && \
-    gem install addressable --source https://gems.ruby-china.com/ || gem install addressable
+RUN gem install addressable
 
 # Copy Python packages from builder
 COPY --from=builder /usr/lib/python3.*/site-packages /usr/lib/python3.12/site-packages

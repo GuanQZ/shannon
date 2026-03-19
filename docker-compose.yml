@@ -15,7 +15,9 @@ services:
       start_period: 30s
 
   worker:
-    image: lumin-worker:latest
+    image: ghcr.io/guanqz/lumin:latest
+    cap_add:
+      - NET_RAW
     entrypoint: >
       sh -c "mkdir -p /app/audit-logs &&
              mkdir -p /app/repos &&
@@ -69,6 +71,8 @@ services:
     ipc: host
     security_opt:
       - seccomp:unconfined
+    cap_add:
+      - NET_RAW
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:8082/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 10s
