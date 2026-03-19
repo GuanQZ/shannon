@@ -84,10 +84,12 @@ function handleMessage(data) {
       addChineseLog(data.log);
     } else if (data.subtype === 'tool') {
       // 工具调用日志存储起来 - 数据在 data.log 中
-      toolLogs.push(data.log);
+      // 注意：agent 在 data.agent 中（WebSocket 推送时），不在 data.log 中
+      const toolLog = { ...data.log, agent: data.agent };
+      toolLogs.push(toolLog);
       // 如果当前显示工具日志，立即渲染
       if (showToolLogs) {
-        addToolLog(data.log);
+        addToolLog(toolLog);
       }
     }
   }
@@ -103,12 +105,56 @@ function addChineseLog(log) {
   div.className = `log-entry ${log.type || ''}`;
   div.dataset.agent = log.agent;
 
-  const content = log.content || '';
+  // 处理不同类型的日志内容 - 支持两种格式：
+  // 1. chinese-agents 格式: log.content
+  // 2. agents 格式: log.data.content
+  let content = log.content || log.data?.content || '';
+
+  // agent_start: 显示 "Agent xxx 已启动"
+  if (log.type === 'agent_start') {
+    const agentName = log.data?.agentName || log.agent || 'Unknown';
+    content = `Agent ${agentName} 已启动`;
+  }
+  // agent_end: 显示 "Agent xxx 已完成"
+  else if (log.type === 'agent_end') {
+    const agentName = log.data?.agentName || log.agent || 'Unknown';
+    const status = log.data?.status || 'completed';
+    content = `Agent ${agentName} 已完成 (${status})`;
+  }
+  // error: 显示错误信息
+  else if (log.type === 'error') {
+    const errorMsg = log.data?.message || log.data?.error || JSON.stringify(log.data) || '未知错误';
+    content = `❌ 错误: ${errorMsg}`;
+  }
+  // tool_error: 显示工具错误
+  else if (log.type === 'tool_error') {
+    const toolName = log.data?.toolName || 'unknown';
+    const errorMsg = log.data?.error || JSON.stringify(log.data) || '';
+    content = `❌ 工具错误 (${toolName}): ${errorMsg}`;
+  }
+  // llm_response: 支持两种格式 - chinese-agents (content在顶层) 和 agents (content在data中)
+  else if (log.type === 'llm_response') {
+    content = log.content || log.data?.content || '';
+    // 如果有 turn 信息，添加到显示
+    const turn = log.data?.turn || log.turn;
+    if (turn) {
+      div.dataset.turn = turn;
+    }
+  }
+  // 其他类型: 尝试从 data 中获取内容
+  else if (!content && log.data) {
+    content = log.data.content || log.data.message || log.data.text || '';
+  }
+
   const time = log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '';
   const agentNameCn = AGENT_NAMES_CN[log.agent] || log.agent;
+  // 获取 turn 信息 (llm_response 类型)
+  const turn = log.data?.turn || log.turn;
+  const turnInfo = turn ? ` (Turn ${turn})` : '';
+
   div.innerHTML = `
     <span class="log-time">${time}</span>
-    <span class="log-agent">[${agentNameCn}]</span>
+    <span class="log-agent">[${agentNameCn}]${turnInfo}</span>
     <span class="log-content">${escapeHtml(content)}</span>
   `;
 
@@ -122,6 +168,8 @@ function addChineseLog(log) {
   if (log.type === 'agent_end') {
     completedAgents.add(log.agent);
     renderAgentList();
+    // 当 agent 完成时，重新获取工作流状态以更新阶段进度
+    fetchWorkflowStatus();
   }
 }
 
@@ -129,25 +177,42 @@ function addChineseLog(log) {
 function addToolLog(log) {
   const container = document.getElementById('log-container');
 
-  const content = log.data?.content || '';
-  let displayContent = content;
+  // Support new format (tool_start/tool_end) and old format (tool_use/tool_result in content)
+  const type = log.type || '';
+  let displayContent = '';
 
-  if (content.includes('"type":"tool_use"')) {
-    try {
-      const parsed = JSON.parse(content);
-      if (parsed.name) {
-        displayContent = `🔧 调用工具: ${parsed.name}`;
-        if (parsed.input) {
-          displayContent += `\n   输入: ${JSON.stringify(parsed.input).substring(0, 200)}...`;
+  if (type === 'tool_start') {
+    const toolName = log.data?.toolName || 'unknown';
+    const parameters = log.data?.parameters || {};
+    displayContent = `🔧 调用工具: ${toolName}`;
+    if (parameters.raw) {
+      displayContent += `\n   输入: ${JSON.stringify(parameters.raw).substring(0, 200)}...`;
+    }
+  } else if (type === 'tool_end') {
+    const result = log.data?.result || '';
+    displayContent = `✅ 工具结果: ${result.substring(0, 200)}`;
+  } else {
+    // Old format: content contains tool_use/tool_result JSON string
+    const content = log.data?.content || '';
+    displayContent = content;
+
+    if (content.includes('"type":"tool_use"')) {
+      try {
+        const parsed = JSON.parse(content);
+        if (parsed.name) {
+          displayContent = `🔧 调用工具: ${parsed.name}`;
+          if (parsed.input) {
+            displayContent += `\n   输入: ${JSON.stringify(parsed.input).substring(0, 200)}...`;
+          }
         }
-      }
-    } catch {}
-  } else if (content.includes('"type":"tool_result"')) {
-    try {
-      const parsed = JSON.parse(content);
-      const toolName = parsed.name || 'unknown';
-      displayContent = `✅ 工具结果 (${toolName}): ${(parsed.output || '').substring(0, 200)}`;
-    } catch {}
+      } catch {}
+    } else if (content.includes('"type":"tool_result"')) {
+      try {
+        const parsed = JSON.parse(content);
+        const toolName = parsed.name || 'unknown';
+        displayContent = `✅ 工具结果 (${toolName}): ${(parsed.output || '').substring(0, 200)}`;
+      } catch {}
+    }
   }
 
   const div = document.createElement('div');
@@ -320,13 +385,76 @@ function toggleToolLogs() {
   if (showToolLogs) {
     btn.textContent = '隐藏工具调用';
     btn.classList.add('active');
-    // 重新渲染所有工具日志
-    toolLogs.forEach(log => addToolLog(log));
+    // 显示所有日志（中文+工具），按时间排序
+    reRenderAllLogs();
   } else {
     btn.textContent = '显示工具调用';
     btn.classList.remove('active');
-    // 移除所有工具日志
-    document.querySelectorAll('.log-entry.tool').forEach(el => el.remove());
+    // 只显示中文日志
+    renderChineseLogsOnly();
+  }
+}
+
+// 只渲染中文日志（不含工具调用）
+async function renderChineseLogsOnly() {
+  try {
+    // 使用 /api/logs 获取 chinese-agents 目录的日志
+    const response = await fetch('/api/logs');
+    const data = await response.json();
+
+    const container = document.getElementById('log-container');
+    container.innerHTML = ''; // 清空容器
+
+    if (data.logs && data.logs.length > 0) {
+      // 按时间排序
+      const sortedLogs = data.logs.sort((a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+
+      sortedLogs.forEach(log => addChineseLog(log));
+    }
+  } catch (e) {
+    console.error('Failed to render Chinese logs:', e);
+  }
+}
+
+// 重新渲染所有日志（中文+工具），按时间排序
+async function reRenderAllLogs() {
+  try {
+    // 合并 chinese-agents 日志 (/api/logs) 和 agents 日志 (/api/all-logs)
+    const [chineseResp, agentsResp] = await Promise.all([
+      fetch('/api/logs'),
+      fetch('/api/all-logs')
+    ]);
+    const chineseData = await chineseResp.json();
+    const agentsData = await agentsResp.json();
+
+    const container = document.getElementById('log-container');
+    container.innerHTML = ''; // 清空容器
+
+    // 合并所有日志
+    const allLogs = [
+      ...(chineseData.logs || []),
+      ...(agentsData.logs || [])
+    ];
+
+    if (allLogs.length > 0) {
+      // 排序所有日志
+      const sortedLogs = allLogs.sort((a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+
+      sortedLogs.forEach(log => {
+        const type = log.type || '';
+        if (type === 'tool_start' || type === 'tool_end') {
+          addToolLog(log);
+        } else {
+          addChineseLog(log);
+        }
+      });
+    }
+  } catch (e) {
+    console.error('Failed to re-render logs:', e);
   }
 }
 
@@ -348,6 +476,7 @@ async function fetchWorkflowStatus() {
 // 获取初始中文日志
 async function fetchChineseLogs() {
   try {
+    // 使用 /api/logs 获取 chinese-agents 目录的日志
     const response = await fetch('/api/logs');
     const data = await response.json();
     if (data.logs && data.logs.length > 0) {
@@ -366,10 +495,16 @@ async function fetchToolLogs() {
     const response = await fetch('/api/all-logs');
     const data = await response.json();
     if (data.logs && data.logs.length > 0) {
-      toolLogs = data.logs.filter(log => {
-        const content = log.data?.content || '';
-        return content.includes('"type":"tool_use"') || content.includes('"type":"tool_result"');
-      });
+      // Filter tool logs and sort by timestamp
+      toolLogs = data.logs
+        .filter(log => {
+          const type = log.type || '';
+          // Support both old format (tool_use/tool_result in content) and new format (tool_start/tool_end)
+          const content = log.data?.content || '';
+          return type === 'tool_start' || type === 'tool_end' ||
+                 content.includes('"type":"tool_use"') || content.includes('"type":"tool_result"');
+        })
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     }
   } catch {}
 }

@@ -494,6 +494,10 @@ async function runInternalAgentPrompt(
 
   console.log(chalk.blue(`  正在执行内网 Agent：${description}...`));
 
+  // Track tool calls and turns for console output
+  const toolCallNames: string[] = [];
+  let turnCount = 0;
+
   try {
     // Initialize session
     await internalAgent.initSession();
@@ -501,8 +505,33 @@ async function runInternalAgentPrompt(
     // Prepend working directory info to prompt so LLM knows where the source code is
     const promptWithWorkingDir = `注意：目标源代码仓库位于工作目录: ${sourceDir}\n所有文件操作都在此目录下进行。\n\n---\n\n${prompt}`;
 
-    // Send chat request
-    const chatResponse = await internalAgent.chat(promptWithWorkingDir);
+    // Stream processing: real-time feedback during execution
+    // Track turn count by counting assistant messages
+    const chatResponse = await internalAgent.chat(promptWithWorkingDir, async (message) => {
+      // Track turn count - each assistant message is a new turn
+      if (message.role === 'assistant') {
+        turnCount++;
+      }
+
+      // Log to audit system for dashboard display
+      // 1. LLM text response (with turn count)
+      if (message.content && message.content.trim() && !message.toolUse && !message.toolResult) {
+        await auditLogger.logLlmResponse(turnCount, message.content);
+      }
+      // 2. Tool call start
+      if (message.toolUse) {
+        await auditLogger.logToolStart(message.toolUse.name, message.toolUse.input);
+      }
+      // 3. Tool call result
+      if (message.toolResult) {
+        await auditLogger.logToolEnd(message.toolResult.output);
+      }
+
+      // Only collect tool call names for console debugging
+      if (message.toolUse) {
+        toolCallNames.push(message.toolUse.name);
+      }
+    });
 
     const duration = timer.stop();
     timingResults.agents[`internal-agent-${description.toLowerCase().replace(/\s+/g, '-')}`] = duration;
@@ -517,34 +546,20 @@ async function runInternalAgentPrompt(
     progress.finish(formatCompletionMessage(
       execContext,
       description,
-      1,
+      turnCount || 1,
       duration
     ));
 
-    // Log tool calls and results to audit log (for dashboard compatibility)
-    // The messages array contains tool_use and tool_result in dashboard-expected format
-    if (chatResponse.messages && chatResponse.messages.length > 0) {
-      for (const message of chatResponse.messages) {
-        // Log tool_use and tool_result messages
-        if (message.toolUse || message.toolResult) {
-          await auditLogger.logLlmResponse(1, message.content);
-        } else if (message.content && message.content.trim()) {
-          // Log regular text content as well
-          await auditLogger.logLlmResponse(1, message.content);
-        }
-      }
-    }
-
-    // Log tool calls if any
-    if (chatResponse.toolCalls.length > 0) {
-      console.log(chalk.gray(`    Tool calls: ${chatResponse.toolCalls.map(t => t.name).join(', ')}`));
+    // Log tool calls to console (kept for debugging)
+    if (toolCallNames.length > 0) {
+      console.log(chalk.gray(`    Tool calls: ${toolCallNames.join(', ')}`));
     }
 
     return {
       result: chatResponse.result,
       success: chatResponse.success,
       duration,
-      turns: 1,
+      turns: turnCount || 1,
       cost: 0,
       model: 'internal-agent',
     };
@@ -552,7 +567,7 @@ async function runInternalAgentPrompt(
     const duration = timer.stop();
     const err = error as Error;
 
-    await auditLogger.logError(err, duration, 1);
+    await auditLogger.logError(err, duration, turnCount || 1);
     progress.stop();
 
     console.log(chalk.red(`    内网 Agent 执行失败: ${err.message}`));
