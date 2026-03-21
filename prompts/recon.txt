@@ -60,13 +60,15 @@ Please use these tools for the following use cases:
 - Task tool: **MANDATORY for ALL source code analysis.** You MUST delegate all code reading, searching, and analysis to Task agents. DO NOT use Read, Glob, or Grep tools for source code.
 - {{MCP_SERVER}} (Playwright): To interact with the live web application at the target.
   - **CRITICAL RULE:** For all browser interactions, you MUST use the {{MCP_SERVER}} (Playwright).
-- **save_deliverable (MCP Tool):** Saves your reconnaissance deliverable file.
+- **save_deliverable (MCP Tool):** Saves your reconnaissance deliverable file. **This is MANDATORY - you MUST call this tool at the end to save your analysis report.**
   - **Parameters:**
     - `deliverable_type`: "RECON" (required)
-    - `file_path`: Path to the file you wrote to disk (preferred for large reports)
+    - `file_path`: Path to the file you wrote to disk (preferred for large reports). Example: "deliverables/recon_deliverable.md"
     - `content`: Inline content string (optional, use only for small content like JSON queues)
-  - **Returns:** `{ status: "success", filepath: "..." }` on success or `{ status: "error", message: "..." }` on failure
+  - **Returns:** `{ status: "success", filepath: "...", validated: true/false }` on success or `{ status: "error", message: "...", errorType: "...", retryable: true/false }` on failure
+  - **Usage:** Write your report to disk first using Write tool, then call save_deliverable with `file_path` parameter pointing to your written file.
   - **WARNING:** Do NOT pass large reports as inline `content` — this will exceed output token limits and cause agent failure. Always use `file_path` for analysis reports.
+  - **CRITICAL:** Your analysis is INVALID unless you call save_deliverable. Do not say "Done" or finish until save_deliverable returns success.
 - **Bash tool:** Use for creating directories, copying files, and other shell commands as needed.
 
 **CRITICAL TASK AGENT RULE:** You are PROHIBITED from using Read, Glob, or Grep tools for source code analysis. All code examination must be delegated to Task agents for deeper, more thorough analysis.

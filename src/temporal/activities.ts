@@ -50,7 +50,7 @@ const MAX_STACK_TRACE_LENGTH = 1000;
 // 交付物校验失败的最大重试次数（代理未正确落盘产物时触发）。
 // Lower than default 50 since this is unlikely to self-heal
 // 交付物缺失通常不是短暂故障，因此重试次数应明显低于默认上限。
-const MAX_OUTPUT_VALIDATION_RETRIES = 3;
+const MAX_OUTPUT_VALIDATION_RETRIES = 10;
 
 /**
  * Truncate error message to prevent buffer overflow in Temporal serialization.
@@ -80,6 +80,8 @@ import {
 } from '../ai/claude-executor.js';
 import { loadPrompt } from '../prompts/prompt-manager.js';
 import { parseConfig, distributeConfig } from '../config-parser.js';
+import { checkToolAvailability, type ToolAvailability } from '../tool-checker.js';
+import { executePreReconPhase } from '../phases/pre-recon.js';
 import { classifyErrorForTemporal } from '../error-handling.js';
 import {
   safeValidateQueueAndDeliverable,
@@ -180,6 +182,22 @@ async function runAgentActivity(
   } = input;
 
   const startTime = Date.now();
+
+  // Update MCP BASE_DIR to current workflow's working directory
+  // 在每个 agent 执行前更新 MCP 的工作目录，避免文件保存到错误目录
+  const mcpBaseUrl = process.env.LUMIN_MCP_SERVER_URL || 'http://localhost:8082';
+  try {
+    const updateRes = await fetch(`${mcpBaseUrl}/set-cwd`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cwd: repoPath }),
+    });
+    if (updateRes.ok) {
+      console.log(chalk.gray(`    MCP working directory updated to: ${repoPath}`));
+    }
+  } catch (err) {
+    console.warn(chalk.yellow(`    Failed to update MCP working directory: ${err}`));
+  }
 
   // Get attempt number from Temporal context (tracks retries automatically)
   // attempt 由 Temporal 自动维护，可用于审计与重试上限判定。
@@ -412,7 +430,43 @@ async function runAgentActivity(
 // 以下导出函数仅做“agent 名称绑定”，核心逻辑全部复用 runAgentActivity。
 
 export async function runPreReconAgent(input: ActivityInput): Promise<AgentMetrics> {
-  return runAgentActivity('pre-recon', input);
+  // 1. 先执行 LLM 代码分析，生成 code_analysis_deliverable.md
+  // 这是为了后续 stitchPreReconOutputs 能够读取代码分析结果
+  console.log(chalk.yellow('  🤖 执行预侦察代码分析...'));
+  const agentMetrics = await runAgentActivity('pre-recon', input);
+
+  // 2. 执行外部扫描工具（nmap, subfinder, whatweb, schemathesis）
+  // 这会生成 pre_recon_deliverable.md（包含扫描结果 + 代码分析）
+  console.log(chalk.yellow('  🔍 执行预侦察扫描工具...'));
+
+  const toolAvailability = await checkToolAvailability();
+  const variables = { webUrl: input.webUrl, repoPath: input.repoPath };
+
+  let distributedConfig: DistributedConfig | null = null;
+  if (input.configPath) {
+    try {
+      const config = await parseConfig(input.configPath);
+      distributedConfig = distributeConfig(config);
+    } catch (err) {
+      console.warn(chalk.yellow(`  ⚠️ 配置加载失败，跳过扫描: ${err}`));
+    }
+  }
+
+  // 扫描工具传入 skipCodeAnalysis: true，因为代码分析已经在步骤1完成了
+  await executePreReconPhase(
+    input.webUrl,
+    input.repoPath,
+    variables,
+    distributedConfig,
+    toolAvailability,
+    input.pipelineTestingMode ?? false,
+    input.workflowId,
+    input.outputPath ?? null
+  );
+
+  console.log(chalk.green('  ✅ 预侦察扫描完成'));
+
+  return agentMetrics;
 }
 
 export async function runReconAgent(input: ActivityInput): Promise<AgentMetrics> {

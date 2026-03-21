@@ -153,7 +153,8 @@ async function runTerminalScan(tool: ToolName, target: string, sourceDir: string
 }
 
 // Wave 1: Initial footprinting + authentication
-// 第一波并行执行“外部探测 + 代码预分析”，快速构建目标基础画像。
+// 第一波并行执行”外部探测 + 代码预分析”，快速构建目标基础画像。
+// skipCodeAnalysis: 当从 executePreReconPhase 调用时跳过 LLM，因为 runAgentActivity 会单独执行
 async function runPreReconWave1(
   webUrl: string,
   sourceDir: string,
@@ -161,7 +162,8 @@ async function runPreReconWave1(
   config: DistributedConfig | null,
   pipelineTestingMode: boolean = false,
   sessionId: string | null = null,
-  outputPath: string | null = null
+  outputPath: string | null = null,
+  skipCodeAnalysis: boolean = false
 ): Promise<Wave1Results> {
   console.log(chalk.blue('    → 正在并行启动第一波任务...'));
 
@@ -173,19 +175,21 @@ async function runPreReconWave1(
   // 流水线测试模式仅验证编排链路，不依赖外部扫描工具与网络可达性。
   if (pipelineTestingMode) {
     console.log(chalk.gray('    ⏭️ 当前为流水线测试模式，已跳过外部工具'));
-    operations.push(
-      runClaudePromptWithRetry(
-        await loadPrompt('pre-recon-code', variables, null, pipelineTestingMode),
-        sourceDir,
-        '*',
-        '',
-        AGENTS['pre-recon'].displayName,
-        'pre-recon',  // Agent name for snapshot creation
-        chalk.cyan,
-        { id: sessionId!, webUrl, repoPath: sourceDir, ...(outputPath && { outputPath }) }  // Session metadata for audit logging (STANDARD: use 'id' field)
-      )
-    );
-    const [codeAnalysis] = await Promise.all(operations);
+    if (!skipCodeAnalysis) {
+      operations.push(
+        runClaudePromptWithRetry(
+          await loadPrompt('pre-recon-code', variables, null, pipelineTestingMode),
+          sourceDir,
+          '*',
+          '',
+          AGENTS['pre-recon'].displayName,
+          'pre-recon',  // Agent name for snapshot creation
+          chalk.cyan,
+          { id: sessionId!, webUrl, repoPath: sourceDir, ...(outputPath && { outputPath }) }  // Session metadata for audit logging (STANDARD: use 'id' field)
+        )
+      );
+    }
+    const codeAnalysis = skipCodeAnalysis ? null : await Promise.race(operations).catch(() => null);
     return {
       nmap: skippedResult('已跳过（流水线测试模式）'),
       subfinder: skippedResult('已跳过（流水线测试模式）'),
@@ -193,34 +197,47 @@ async function runPreReconWave1(
       codeAnalysis: codeAnalysis as AgentResult
     };
   } else {
+    // Always run the scans
     operations.push(
       runTerminalScan('nmap', webUrl),
       runTerminalScan('subfinder', webUrl),
-      runTerminalScan('whatweb', webUrl),
-      runClaudePromptWithRetry(
-        await loadPrompt('pre-recon-code', variables, null, pipelineTestingMode),
-        sourceDir,
-        '*',
-        '',
-        AGENTS['pre-recon'].displayName,
-        'pre-recon',  // Agent name for snapshot creation
-        chalk.cyan,
-        { id: sessionId!, webUrl, repoPath: sourceDir, ...(outputPath && { outputPath }) }  // Session metadata for audit logging (STANDARD: use 'id' field)
-      )
+      runTerminalScan('whatweb', webUrl)
     );
+
+    // Only run code analysis if not skipped
+    if (!skipCodeAnalysis) {
+      operations.push(
+        runClaudePromptWithRetry(
+          await loadPrompt('pre-recon-code', variables, null, pipelineTestingMode),
+          sourceDir,
+          '*',
+          '',
+          AGENTS['pre-recon'].displayName,
+          'pre-recon',  // Agent name for snapshot creation
+          chalk.cyan,
+          { id: sessionId!, webUrl, repoPath: sourceDir, ...(outputPath && { outputPath }) }  // Session metadata for audit logging (STANDARD: use 'id' field)
+        )
+      );
+    }
   }
 
   // Check if authentication config is provided for login instructions injection
-  // 记录配置状态，便于排查“为何未注入登录指令”问题。
+  // 记录配置状态，便于排查”为何未注入登录指令”问题。
   console.log(chalk.gray(`    → 配置检查：配置${config ? '已提供' : '缺失'}，认证配置${config?.authentication ? '已提供' : '缺失'}`));
 
-  const [nmap, subfinder, whatweb, codeAnalysis] = await Promise.all(operations);
+  // Wait for all operations to complete
+  // If code analysis was skipped, operations only has 3 items (nmap, subfinder, whatweb)
+  const results = await Promise.all(operations);
+  const nmap = results[0];
+  const subfinder = results[1];
+  const whatweb = results[2];
+  const codeAnalysis = results[3] as AgentResult | undefined;
 
   return {
     nmap: { kind: 'scan', result: nmap as TerminalScanResult },
     subfinder: { kind: 'scan', result: subfinder as TerminalScanResult },
     whatweb: { kind: 'scan', result: whatweb as TerminalScanResult },
-    codeAnalysis: codeAnalysis as AgentResult
+    codeAnalysis: codeAnalysis ?? { success: false, duration: 0 }
   };
 }
 
@@ -393,7 +410,7 @@ export async function executePreReconPhase(
   const timer = new Timer('phase-1-pre-recon');
 
   console.log(chalk.yellow('第一波：基础指纹探测...'));
-  const wave1Results = await runPreReconWave1(webUrl, sourceDir, variables, config, pipelineTestingMode, sessionId, outputPath);
+  const wave1Results = await runPreReconWave1(webUrl, sourceDir, variables, config, pipelineTestingMode, sessionId, outputPath, true);
   console.log(chalk.green('  ✅ 第一波任务已完成'));
 
   console.log(chalk.yellow('第二波：补充扫描...'));

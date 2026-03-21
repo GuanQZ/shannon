@@ -294,7 +294,140 @@ function renderAgentList() {
     });
     html += `</div>`;
   });
+
+  // 添加报告下载按钮
+  html += '<div class="download-section">';
+  html += '<button class="download-btn" onclick="showDeliverablesModal()">';
+  html += '<span class="download-icon">📁</span> 查看报告';
+  html += '</button>';
+  html += '</div>';
+
   container.innerHTML = html;
+}
+
+// 弹窗状态
+let isModalOpen = false;
+
+// 显示 deliverables 弹窗
+async function showDeliverablesModal() {
+  const modal = document.getElementById('deliverables-modal');
+  if (!modal) {
+    createModalHTML();
+  }
+  const modalEl = document.getElementById('deliverables-modal');
+  modalEl.style.display = 'flex';
+  isModalOpen = true;
+
+  // 加载文件树
+  await loadDeliverablesTree();
+}
+
+// 创建弹窗 HTML（仅首次）
+function createModalHTML() {
+  const body = document.body;
+  const modalHtml = `
+    <div id="deliverables-modal" class="modal" style="display:none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modal-title">报告文件</h3>
+          <button class="modal-close" onclick="closeDeliverablesModal()">×</button>
+        </div>
+        <div class="modal-body" id="deliverables-tree">
+          <div class="loading">加载中...</div>
+        </div>
+      </div>
+    </div>
+  `;
+  body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+// 关闭弹窗
+function closeDeliverablesModal() {
+  const modal = document.getElementById('deliverables-modal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+  isModalOpen = false;
+}
+
+// 加载文件树
+async function loadDeliverablesTree() {
+  try {
+    const resp = await fetch('/api/deliverables-tree');
+    const data = await resp.json();
+
+    const container = document.getElementById('deliverables-tree');
+
+    if (data.error) {
+      container.innerHTML = '<div class="error">' + escapeHtml(data.error) + '</div>';
+      return;
+    }
+
+    if (!data.tree || data.tree.length === 0) {
+      container.innerHTML = '<div class="empty">暂无报告文件</div>';
+      return;
+    }
+
+    // 渲染文件树
+    container.innerHTML = renderFileTree(data.tree);
+  } catch (e) {
+    console.error('Failed to load tree:', e);
+    document.getElementById('deliverables-tree').innerHTML =
+      '<div class="error">加载失败: ' + e.message + '</div>';
+  }
+}
+
+// 渲染文件树（递归）
+function renderFileTree(items, level) {
+  if (level === undefined) level = 0;
+  let html = '<ul class="file-tree" style="margin-left:' + (level * 16) + 'px">';
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item.type === 'dir') {
+      html +=
+        '<li class="tree-dir">' +
+        '<span class="tree-toggle" onclick="toggleDir(this)">▶</span>' +
+        '<span class="tree-folder" onclick="toggleDir(this)">📁 ' + escapeHtml(item.name) + '</span>' +
+        '<div class="tree-children" style="display:none">' +
+        renderFileTree(item.children || [], level + 1) +
+        '</div>' +
+        '</li>';
+    } else {
+      html +=
+        '<li class="tree-file">' +
+        '<span class="tree-file-icon">📄</span>' +
+        '<a href="#" onclick="downloadFile(\'' + encodeURIComponent(item.path) + '\'); return false;">' +
+        escapeHtml(item.name) +
+        '</a>' +
+        '</li>';
+    }
+  }
+
+  html += '</ul>';
+  return html;
+}
+
+// 切换文件夹展开/折叠
+function toggleDir(el) {
+  const li = el.closest('li');
+  const children = li.querySelector('.tree-children');
+  const toggle = li.querySelector('.tree-toggle');
+
+  if (children.style.display === 'none') {
+    children.style.display = 'block';
+    if (toggle) toggle.textContent = '▼';
+  } else {
+    children.style.display = 'none';
+    if (toggle) toggle.textContent = '▶';
+  }
+}
+
+// 下载文件
+function downloadFile(encodedPath) {
+  const path = decodeURIComponent(encodedPath);
+  const url = '/api/deliverables/download?path=' + encodeURIComponent(path);
+  window.open(url, '_blank');
 }
 
 // 按Agent筛选日志（多选）
@@ -439,8 +572,32 @@ async function reRenderAllLogs() {
     ];
 
     if (allLogs.length > 0) {
+      // 去重：基于 timestamp + content 组合去重，优先保留有 turn 的版本
+      const seen = new Map();
+      allLogs.forEach(log => {
+        // 获取 content 用于去重
+        const content = log.content || log.data?.content || '';
+        const key = `${log.timestamp}-${log.type}-${content.slice(0, 100)}`;
+
+        // 如果已经存在，优先保留有 turn 信息的版本
+        if (!seen.has(key)) {
+          seen.set(key, log);
+        } else {
+          const existing = seen.get(key);
+          // 如果新版本有 turn 但旧版本没有，则替换
+          const newHasTurn = log.data?.turn || log.turn;
+          const existingHasTurn = existing.data?.turn || existing.turn;
+          if (newHasTurn && !existingHasTurn) {
+            seen.set(key, log);
+          }
+        }
+      });
+
+      // 获取去重后的日志
+      const uniqueLogs = Array.from(seen.values());
+
       // 排序所有日志
-      const sortedLogs = allLogs.sort((a, b) =>
+      const sortedLogs = uniqueLogs.sort((a, b) =>
         new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );
 

@@ -74,7 +74,7 @@ const PRODUCTION_RETRY = {
   initialInterval: '5 minutes',
   maximumInterval: '30 minutes',
   backoffCoefficient: 2,
-  maximumAttempts: 50,
+  maximumAttempts: 100,
   nonRetryableErrorTypes: [
     'AuthenticationError',
     'PermissionError',

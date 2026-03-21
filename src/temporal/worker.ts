@@ -51,6 +51,61 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * 全局错误处理器 - 防止未捕获的错误导致进程崩溃
+ * 记录错误后退出，让 Docker 重启 worker
+ */
+function setupGlobalErrorHandlers(): void {
+  // 未捕获的异常
+  process.on('uncaughtException', (err: Error) => {
+    console.error(chalk.red('\n=== 未捕获的异常 ==='));
+    console.error(chalk.red(`错误: ${err.message}`));
+    console.error(chalk.red(`堆栈: ${err.stack}`));
+
+    // 检查是否是网络相关错误（可以重试）
+    const isNetworkError = err.message.includes('terminated') ||
+                          err.message.includes('timeout') ||
+                          err.message.includes('ECONNREFUSED') ||
+                          err.message.includes('UND_ERR_');
+
+    if (isNetworkError) {
+      console.error(chalk.yellow('这是网络相关错误，Worker 将退出并由 Docker 重启'));
+    } else {
+      console.error(chalk.red('这是未知错误，Worker 将退出'));
+    }
+
+    // 退出进程，让 Docker 重启 worker
+    process.exit(1);
+  });
+
+  // 未处理的 Promise 拒绝
+  process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
+    console.error(chalk.red('\n=== 未处理的 Promise 拒绝 ==='));
+    console.error(chalk.red(`原因: ${reason}`));
+
+    // 尝试获取堆栈信息
+    if (reason instanceof Error) {
+      console.error(chalk.red(`堆栈: ${reason.stack}`));
+
+      // 检查是否是网络相关错误
+      const isNetworkError = reason.message.includes('terminated') ||
+                            reason.message.includes('timeout') ||
+                            reason.message.includes('ECONNREFUSED') ||
+                            reason.message.includes('UND_ERR_');
+
+      if (isNetworkError) {
+        console.error(chalk.yellow('这是网络相关错误，Worker 将退出并由 Docker 重启'));
+      }
+    }
+
+    // 退出进程，让 Docker 重启 worker
+    process.exit(1);
+  });
+}
+
+// 设置全局错误处理器
+setupGlobalErrorHandlers();
+
 async function runWorker(): Promise<void> {
   const address = process.env.TEMPORAL_ADDRESS || 'localhost:7233';
   console.log(chalk.cyan(`正在连接 Temporal：${address}...`));

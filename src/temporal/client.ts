@@ -193,11 +193,8 @@ async function startPipeline(): Promise<void> {
     console.log(chalk.green.bold(`✓ 工作流已启动：${workflowId}`));
     console.log();
     console.log(chalk.white('  目标地址：   ') + chalk.cyan(webUrl));
-    if (repos) {
-      console.log(chalk.white('  代码仓库：   ') + chalk.cyan(repos));
-    } else {
-      console.log(chalk.white('  代码仓库：   ') + chalk.cyan(repoPath));
-    }
+    // Always show the container path (repoPath) for both single and multi-repo modes
+    console.log(chalk.white('  代码仓库：   ') + chalk.cyan(repoPath));
     if (configPath) {
       console.log(chalk.white('  配置文件：   ') + chalk.cyan(configPath));
     }

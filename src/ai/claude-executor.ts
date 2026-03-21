@@ -579,7 +579,7 @@ async function runInternalAgentPrompt(
       success: false,
       duration,
       cost: 0,
-      retryable: false,
+      retryable: isRetryableError(err),
     };
   }
 }

@@ -6,6 +6,16 @@ import path from 'path';
 
 const execAsync = promisify(exec);
 
+// Resolve file path: use absolute path directly if provided, otherwise join with cwd
+function resolvePath(filePath: string, cwd: string): string {
+  // If it's an absolute path (starts with /), use it directly
+  if (path.isAbsolute(filePath)) {
+    return filePath;
+  }
+  // Otherwise, join with cwd
+  return path.join(cwd, filePath);
+}
+
 // Execute command using spawn (more reliable than exec for shell commands)
 function execCommand(command: string, cwd: string): Promise<string> {
   return new Promise((resolve) => {
@@ -47,7 +57,7 @@ const BASE_DIR = `/app/deliverables/${REPO_DIR}`;
 export const sdkTools: SDKTool[] = [
   {
     name: 'Read',
-    description: 'Read a file from the repository. Returns the file content.',
+    description: 'Reads local files, supports images/PDFs, defaults to 2000 lines. Returns the file content.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -57,14 +67,14 @@ export const sdkTools: SDKTool[] = [
     },
     handler: async (args: Record<string, unknown>, context: { cwd: string }) => {
       const file_path = args.file_path as string;
-      const fullPath = path.join(context.cwd, file_path);
+      const fullPath = resolvePath(file_path, context.cwd);
       const content = await fs.readFile(fullPath, 'utf-8');
       return content;
     },
   },
   {
     name: 'Glob',
-    description: 'Find files matching a pattern in the repository.',
+    description: "Fast file pattern matching tool that works with any codebase size. Supports glob patterns like '**/*.js' or 'src/**/*.ts'. Returns matching file paths sorted by modification time. Use this tool when you need to find files by name patterns.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -80,7 +90,7 @@ export const sdkTools: SDKTool[] = [
   },
   {
     name: 'Grep',
-    description: 'Search for patterns in files.',
+    description: "Search for patterns in files. Use this tool when you need to find files containing specific patterns. Supports full regex syntax.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -92,7 +102,7 @@ export const sdkTools: SDKTool[] = [
     handler: async (args: Record<string, unknown>, context: { cwd: string }) => {
       const pattern = args.pattern as string;
       const searchPath = args.path as string | undefined;
-      const searchDir = searchPath ? path.join(context.cwd, searchPath) : context.cwd;
+      const searchDir = searchPath ? resolvePath(searchPath, context.cwd) : context.cwd;
       try {
         const { stdout } = await execAsync(`rg -n "${pattern}" "${searchDir}" || true`);
         return stdout || 'No matches found';
@@ -103,7 +113,7 @@ export const sdkTools: SDKTool[] = [
   },
   {
     name: 'Bash',
-    description: 'Run a shell command in the repository.',
+    description: 'Executes bash commands in a persistent shell session with timeout support.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -123,7 +133,7 @@ export const sdkTools: SDKTool[] = [
   },
   {
     name: 'Write',
-    description: 'Write content to a file in the repository.',
+    description: 'Writes/overwrites files to the local filesystem.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -135,7 +145,7 @@ export const sdkTools: SDKTool[] = [
     handler: async (args: Record<string, unknown>, context: { cwd: string }) => {
       const file_path = args.file_path as string;
       const content = args.content as string;
-      const fullPath = path.join(context.cwd, file_path);
+      const fullPath = resolvePath(file_path, context.cwd);
       await fs.mkdir(path.dirname(fullPath), { recursive: true });
       await fs.writeFile(fullPath, content, 'utf-8');
       return `File written: ${file_path}`;

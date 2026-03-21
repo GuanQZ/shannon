@@ -243,6 +243,20 @@ cmd_start() {
       fi
     done
 
+    # Initialize git repository in parent directory for multi-repo mode
+    # This enables git operations (checkpoint, rollback) across all cloned repos
+    if [ "$REPO_COUNT" -gt 1 ]; then
+      (cd "$CLONE_BASE" && git init && git config user.email "lumin@local" && git config user.name "Lumin Agent")
+      # Remove .git from sub-repos in CLONE_BASE only (not original repos)
+      # This prevents them from being treated as submodules
+      for subdir in "$CLONE_BASE"/*/; do
+        if [ -d "$subdir/.git" ]; then
+          rm -rf "$subdir/.git"
+        fi
+      done
+      (cd "$CLONE_BASE" && git add -A && git commit -m "Initial commit: multi-repo workspace" 2>/dev/null || true && echo "Initialized git workspace: $CLONE_BASE")
+    fi
+
     if [ "$SAFE_MODE" = "true" ]; then
       echo "Safe mode: git push URLs disabled for isolated workspace"
     fi

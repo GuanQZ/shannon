@@ -135,8 +135,8 @@ Defensive security tool only. Use only on systems you own or have explicit permi
 ## Troubleshooting
 
 - **启动新渗透任务前** — 必须先停止旧任务: `./lumin stop`，避免多个工作流同时运行消耗 token，重启服务后等待mock和lumin的mcp完成链接后再开始渗透任务。
+- **渗透测试方法** - 使用./lumin start URL=http://localhost:8080 REPO=https://github.com/GuanQZ/lumin-target.git CONFIG=./configs/lumin-target.yaml
 - **不要重新构建 lumin** — 只修改 mock-server，只重建 mock-server 镜像
-- **"Repository not found"** — `REPO` must be a folder name inside `./repos/`, not an absolute path. Clone or symlink your repo there first: `ln -s /path/to/repo ./repos/my-repo`
 - **"Temporal not ready"** — Wait for health check or `docker compose logs temporal`
 - **Worker not processing** — Check `docker compose ps`
 - **Reset state** — `./lumin stop CLEAN=true`

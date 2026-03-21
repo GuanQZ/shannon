@@ -1,0 +1,21 @@
+[   24155ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ http://login/?username=admin&password=password123:0
+[   62469ms] [ERROR] WebSocket connection to 'ws://localhost:5173/?token=SbF5dAB3vkxI' failed:  @ http://localhost:5173/@vite/client:535
+[   63488ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[   64494ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[   65624ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/src/App.vue:0
+[   86966ms] [ERROR] WebSocket connection to 'ws://localhost:5173/?token=_INBiQdKHWBY' failed:  @ http://localhost:5173/@vite/client:535
+[   87980ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[   88988ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[   90131ms] [WARNING] [Vue warn]: Unhandled error during execution of setup function 
+  at <App> @ http://localhost:5173/node_modules/.vite/deps/vue.js?v=4ead66cd:2205
+[   90132ms] ReferenceError: Cannot access 'api' before initialization
+    at setup (http://localhost:5173/src/App.vue:7:17)
+    at callWithErrorHandling (http://localhost:5173/node_modules/.vite/deps/vue.js?v=4ead66cd:2353:19)
+    at setupStatefulComponent (http://localhost:5173/node_modules/.vite/deps/vue.js?v=4ead66cd:10262:25)
+    at setupComponent (http://localhost:5173/node_modules/.vite/deps/vue.js?v=4ead66cd:10224:36)
+    at mountComponent (http://localhost:5173/node_modules/.vite/deps/vue.js?v=4ead66cd:8164:7)
+    at processComponent (http://localhost:5173/node_modules/.vite/deps/vue.js?v=4ead66cd:8130:9)
+    at patch (http://localhost:5173/node_modules/.vite/deps/vue.js?v=4ead66cd:7634:11)
+    at render2 (http://localhost:5173/node_modules/.vite/deps/vue.js?v=4ead66cd:8945:7)
+    at mount (http://localhost:5173/node_modules/.vite/deps/vue.js?v=4ead66cd:6399:13)
+    at app.mount (http://localhost:5173/node_modules/.vite/deps/vue.js?v=4ead66cd:12633:19)

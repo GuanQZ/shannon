@@ -84,7 +84,12 @@ const server = http.createServer((req, res) => {
             const logs = content.split('\n').filter(line => line.trim())
               .map(line => { try { return JSON.parse(line); } catch (e) { return null; } })
               .filter(Boolean);
-            logs.forEach(log => { if (log && !log.agent) log.agent = entry; });
+            logs.forEach(log => {
+              if (log && !log.agent) {
+                // 从文件名提取agent名称，如: 1773711957402_pre-recon_attempt-1.log -> pre-recon
+                log.agent = file.replace(/^\d+_([^_]+)_attempt.*\.log$/, '$1');
+              }
+            });
             allLogs.push(...logs);
           }
         }
@@ -162,35 +167,35 @@ const server = http.createServer((req, res) => {
           return;
         }
         const { Connection, Client } = temporalClient;
-        const connection = await Connection.connect({ address: 'localhost:7233' });
+        const connection = await Connection.connect({ address: process.env.TEMPORAL_ADDRESS || 'temporal:7233' });
         const client = new Client({ connection });
 
         // 直接使用 sessionId 查询 workflow
-        let workflowHandle = null;
+        let workflowStatus = null;
         try {
           const handle = client.workflow.getHandle(sessionId);
           const desc = await handle.describe();
-          const status = desc.status?.name || desc.status;
-          if (status === 'RUNNING') {
-            workflowHandle = { workflowId: sessionId };
-          }
+          workflowStatus = desc.status?.name || desc.status;
+          console.log('Workflow status:', workflowStatus);
         } catch (e) {
-          // workflow 不存在或已结束
+          // workflow 不存在
+          console.log('Workflow not found:', e.message);
         }
 
-        if (!workflowHandle) {
-          // 没有找到运行中的 workflow
+        if (!workflowStatus) {
+          // workflow 不存在，返回默认值
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ currentPhase: 'pre-recon', completedAgents: [], status: 'unknown' }));
           await connection.close();
           return;
         }
 
-        const handle = client.workflow.getHandle(workflowHandle.workflowId);
+        // 查询进度（无论 RUNNING 还是 COMPLETED）
+        const handle = client.workflow.getHandle(sessionId);
         const progress = await handle.query('getProgress');
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-          currentPhase: progress.currentPhase || 'pre-recon',
+          currentPhase: progress.currentPhase || (progress.status === 'completed' ? 'reporting' : 'pre-recon'),
           completedAgents: progress.completedAgents || [],
           status: progress.status
         }));
@@ -201,6 +206,154 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ currentPhase: 'pre-recon', completedAgents: [], status: 'unknown' }));
       }
     })();
+    return;
+  }
+
+  // 获取 deliverables 文件树 API
+  if (req.url.startsWith('/api/deliverables-tree')) {
+    (async () => {
+      try {
+        // 从 session.json 读取 repoPath
+        const sessionJsonPath = path.join(AUDIT_LOGS_DIR, sessionId, 'session.json');
+        let repoPath = null;
+
+        if (fs.existsSync(sessionJsonPath)) {
+          const sessionData = JSON.parse(fs.readFileSync(sessionJsonPath, 'utf8'));
+          repoPath = sessionData.session?.repoPath;
+        }
+
+        if (!repoPath) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '无法找到报告目录' }));
+          return;
+        }
+
+        const deliverablesDir = path.join(repoPath, 'deliverables');
+
+        if (!fs.existsSync(deliverablesDir)) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ tree: [], error: '报告目录不存在' }));
+          return;
+        }
+
+        // 递归构建文件树
+        function buildTree(dirPath, relativePath = '') {
+          const items = fs.readdirSync(dirPath);
+          const tree = [];
+          const resolvedDir = path.resolve(dirPath);
+
+          for (const item of items) {
+            const fullPath = path.join(dirPath, item);
+            const relPath = path.join(relativePath, item);
+            const stats = fs.statSync(fullPath);
+
+            // 安全检查：防止路径遍历
+            const resolvedPath = path.resolve(fullPath);
+            if (!resolvedPath.startsWith(resolvedDir + path.sep)) {
+              continue; // 跳过 deliverables 目录外的路径
+            }
+
+            if (stats.isDirectory()) {
+              tree.push({
+                name: item,
+                type: 'dir',
+                path: relPath,
+                children: buildTree(fullPath, relPath)
+              });
+            } else {
+              tree.push({
+                name: item,
+                type: 'file',
+                path: relPath
+              });
+            }
+          }
+
+          // 按文件夹在前、文件在后排序
+          tree.sort((a, b) => {
+            if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+            return a.name.localeCompare(b.name);
+          });
+
+          return tree;
+        }
+
+        const tree = buildTree(deliverablesDir);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ tree, repoPath }));
+      } catch (e) {
+        console.error('deliverables-tree error:', e.message);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '服务器内部错误' }));
+      }
+    })();
+    return;
+  }
+
+  // 下载单个文件 API
+  if (req.url.startsWith('/api/deliverables/download')) {
+    try {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const encodedPath = url.searchParams.get('path');
+
+      if (!encodedPath) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '缺少文件路径' }));
+        return;
+      }
+
+      // 解码路径
+      const relativePath = decodeURIComponent(encodedPath);
+
+      // 从 session.json 读取 repoPath
+      const sessionJsonPath = path.join(AUDIT_LOGS_DIR, sessionId, 'session.json');
+      let repoPath = null;
+
+      if (fs.existsSync(sessionJsonPath)) {
+        const sessionData = JSON.parse(fs.readFileSync(sessionJsonPath, 'utf8'));
+        repoPath = sessionData.session?.repoPath;
+      }
+
+      if (!repoPath) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '无法找到报告目录' }));
+        return;
+      }
+
+      // 构建完整文件路径
+      const filePath = path.join(repoPath, 'deliverables', relativePath);
+
+      // 安全检查：确保文件路径在 deliverables 目录内
+      const deliverablesDir = path.join(repoPath, 'deliverables');
+      const resolvedPath = path.resolve(filePath);
+      const resolvedDir = path.resolve(deliverablesDir);
+
+      if (!resolvedPath.startsWith(resolvedDir)) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '禁止访问' }));
+        return;
+      }
+
+      if (!fs.existsSync(filePath)) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '文件不存在' }));
+        return;
+      }
+
+      // 读取文件并返回
+      const content = fs.readFileSync(filePath);
+      const fileName = path.basename(filePath);
+
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${fileName}"`
+      });
+      res.end(content);
+    } catch (e) {
+      console.error('download error:', e.message);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: '服务器内部错误' }));
+    }
     return;
   }
 
@@ -295,6 +448,10 @@ function checkChineseLogs() {
         newLines.forEach(line => {
           try {
             const log = JSON.parse(line);
+            // 从文件名提取agent名称，如: pre-recon.zh.log -> pre-recon
+            if (!log.agent) {
+              log.agent = file.replace(/\.zh\.log$/, '');
+            }
             broadcast({ type: 'log', subtype: 'chinese', log });
           } catch (e) {
             // 忽略解析错误
@@ -342,8 +499,13 @@ function checkToolLogs() {
             newLines.forEach(line => {
               try {
                 const log = JSON.parse(line);
-                const logContent = (log.data && log.data.content) || '';
-                if (logContent.includes('"type":"tool_use"') || logContent.includes('"type":"tool_result"')) {
+                const logType = log.type || '';
+                // 支持新格式 (tool_start/tool_end) 和旧格式 (tool_use/tool_result in content)
+                const isToolLog = logType === 'tool_start' || logType === 'tool_end' ||
+                                  (log.data && log.data.content &&
+                                   (log.data.content.includes('"type":"tool_use"') ||
+                                    log.data.content.includes('"type":"tool_result"')));
+                if (isToolLog) {
                   // 从文件名提取agent名称，如: 1772534884109_xss-exploit_attempt-1.log -> xss-exploit
                   const agentName = file.replace(/^\d+_([^_]+)_attempt.*\.log$/, '$1');
                   broadcast({ type: 'log', subtype: 'tool', log, agent: agentName });

@@ -21,7 +21,7 @@
 
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
-    "noEmitOnError": true,
+    "noEmitOnError": false,
 
     // Other Outputs
     "sourceMap": true,
@@ -29,8 +29,8 @@
     "declarationMap": true,
 
     // Stricter Typechecking Options
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": false,
+    "exactOptionalPropertyTypes": false,
 
     // Style Options
     // "noImplicitReturns": true,

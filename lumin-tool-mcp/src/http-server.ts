@@ -5,6 +5,14 @@ import express from 'express';
 import cors from 'cors';
 import { sdkTools } from './tools/sdk-tools.js';
 
+// In-memory todo store (simple global store for now)
+const globalTodoStore: Array<{
+  id: string;
+  content: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  activeForm?: string;
+}> = [];
+
 // Get target directory from environment - support dynamic update via /set-cwd API
 // Default to /app/repos/ as the base for target repos
 let BASE_DIR = process.env.LUMIN_TARGET_REPO
@@ -14,8 +22,8 @@ let BASE_DIR = process.env.LUMIN_TARGET_REPO
 // Store active server-transport pairs by session ID
 const sessions = new Map<string, { server: Server; transport: SSEServerTransport }>();
 
-// Filter SDK tools: exclude Bash and Write (only keep Read, Glob, Grep)
-const allowedSdkToolNames = ['Read', 'Glob', 'Grep'];
+// Filter SDK tools: allow all including Write and Bash
+const allowedSdkToolNames = ['Read', 'Glob', 'Grep', 'Bash', 'Write'];
 
 /**
  * Create a new MCP server instance with all tools registered.
@@ -33,26 +41,59 @@ function createMcpServer(): Server {
     const customTools = [
       {
         name: 'save_deliverable',
-        description: 'Saves deliverable files with automatic validation.',
+        description: 'Saves deliverable files with automatic validation. Queue files must have {"vulnerabilities": [...]} structure. For large reports, write the file to disk first then pass file_path instead of inline content to avoid output token limits.',
         inputSchema: {
           type: 'object',
           properties: {
-            deliverable_type: { type: 'string' },
-            content: { type: 'string' },
-            file_path: { type: 'string' },
+            deliverable_type: { type: 'string', description: 'Type of deliverable (CODE_ANALYSIS, RECON, INJECTION_ANALYSIS, INJECTION_QUEUE, etc.)' },
+            content: { type: 'string', description: 'File content (markdown for analysis/evidence, JSON for queues). Optional if file_path is provided.' },
+            file_path: { type: 'string', description: 'Path to a file whose contents should be used as the deliverable content. Use this for large reports to avoid output token limits.' },
           },
           required: ['deliverable_type'],
         },
       },
       {
         name: 'generate_totp',
-        description: 'Generates 6-digit TOTP code for authentication.',
+        description: 'Generates 6-digit TOTP code for authentication. Secret must be base32-encoded.',
         inputSchema: {
           type: 'object',
           properties: {
-            secret: { type: 'string' },
+            secret: { type: 'string', description: 'Base32-encoded secret key for TOTP generation' },
           },
           required: ['secret'],
+        },
+      },
+      {
+        name: 'TodoWrite',
+        description: 'Creates and manages task lists for tracking analysis progress. Use this to track multi-step analysis tasks.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            todos: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  content: { type: 'string', description: 'Task description' },
+                  status: { type: 'string', enum: ['pending', 'in_progress', 'completed'], description: 'Task status' },
+                  activeForm: { type: 'string', description: 'Active form - use "analyzing" for in_progress' },
+                },
+              },
+              description: 'List of tasks to manage',
+            },
+          },
+        },
+      },
+      {
+        name: 'Task',
+        description: 'Launch a new task - execute a sub-task in an isolated environment using LLM. Use this to parallelize independent analysis tasks. Launch multiple agents concurrently whenever possible, to maximize performance.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            description: { type: 'string', description: 'A short (3-5 word) description of the task' },
+            prompt: { type: 'string', description: 'The task for the agent to perform' },
+          },
+          required: ['description', 'prompt'],
         },
       },
     ];
@@ -91,6 +132,27 @@ function createMcpServer(): Server {
         const validatedArgs = GenerateTotpInputSchema.parse(toolArgs);
         const result = await generateTotp(validatedArgs);
         return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      }
+
+      if (toolName === 'TodoWrite') {
+        const todos = (toolArgs as any)?.todos || [];
+        const result = {
+          status: 'ok',
+          todos: todos.map((t: any, index: number) => ({
+            id: `todo-${Date.now()}-${index}`,
+            content: t.content || '',
+            status: t.status || 'pending',
+            activeForm: t.activeForm,
+          })),
+        };
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      }
+
+      if (toolName === 'Task') {
+        const { executeTask, TaskInputSchema } = await import('./tools/task.js');
+        const validatedArgs = TaskInputSchema.parse(toolArgs);
+        const result = await executeTask(validatedArgs);
+        return { content: [{ type: 'text', text: result.result }] };
       }
 
       // SDK tools - find matching tool and execute

@@ -1,0 +1,8 @@
+[    7999ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ http://login/?username=admin&password=password123:0
+[   70324ms] [ERROR] WebSocket connection to 'ws://localhost:5173/?token=GgPg3kugjU5K' failed:  @ http://localhost:5173/@vite/client:535
+[   71336ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[   72340ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[   73349ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[   74359ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[   75368ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[   76376ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0

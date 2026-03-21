@@ -273,14 +273,14 @@ async function translateText(
 
       const translationPrompt = `You are a professional technical translator. Translate the following English penetration testing report to Simplified Chinese.
 
-IMPORTANT RULES:
+IMPORTANT: Output ONLY the translated content. Do NOT include any summary, confirmation, or explanation. Do NOT prefix with "Translation:" or similar. Just output the translated text directly.
+
+RULES:
 1. Keep all technical terms in English: SQL injection, XSS, SSRF, CVE, payload, endpoint, HTTP, API, JSON, etc.
 2. Keep code blocks, file paths, and URLs unchanged.
 3. Keep vulnerability IDs (like INJ-VULN-001) unchanged.
 4. Translate narrative content to Chinese.
 5. Preserve Markdown formatting.
-
-Translate now:
 
 ${text}`;
 
@@ -300,14 +300,14 @@ ${text}`;
 
   const translationPrompt = `You are a professional technical translator. Translate the following English penetration testing report to Simplified Chinese.
 
-IMPORTANT RULES:
+IMPORTANT: Output ONLY the translated content. Do NOT include any summary, confirmation, or explanation. Do NOT prefix with "Translation:" or similar. Just output the translated text directly.
+
+RULES:
 1. Keep all technical terms in English: SQL injection, XSS, SSRF, CVE, payload, endpoint, HTTP, API, JSON, etc.
 2. Keep code blocks, file paths, and URLs unchanged.
 3. Keep vulnerability IDs (like INJ-VULN-001) unchanged.
 4. Translate narrative content to Chinese.
 5. Preserve Markdown formatting.
-
-Translate now:
 
 ${text}`;
 
@@ -324,7 +324,7 @@ ${text}`;
       body: JSON.stringify({
         model: modelToUse,
         max_tokens: 8192,
-        system: 'You are a translator. Translate the text to Simplified Chinese ONLY. Output ONLY the translation, no original text, no explanations. Keep technical terms (CVEs, payloads, endpoints, HTTP methods, file paths, code) in English. Do not include any prefix like [agent] or labels.',
+        system: 'You are a professional technical translator. Translate to Simplified Chinese ONLY. Output ONLY the translated content - no summaries, confirmations, or explanations. Do NOT prefix with "Translation:" or any label. Keep technical terms (SQL injection, XSS, SSRF, CVEs, payloads, endpoints, HTTP methods, file paths, code) in English. Preserve Markdown formatting.',
         messages: [{ role: 'user', content: text }]
       })
     });
