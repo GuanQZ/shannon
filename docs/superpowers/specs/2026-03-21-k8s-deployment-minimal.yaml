@@ -1,0 +1,85 @@
+# 简化版 Deployment（如果完整版无法部署，可尝试此版本）
+# 注意：简化版会禁用部分功能
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lumin-worker
+  labels:
+    app: lumin-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lumin-worker
+  template:
+    metadata:
+      labels:
+        app: lumin-worker
+    spec:
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+
+      containers:
+        - name: worker
+          image: ghcr.io/guanqz/lumin:latest
+          imagePullPolicy: Always
+
+          # 简化权限配置
+          securityContext:
+            privileged: false
+            # 不添加 NET_RAW
+            # seccomp 使用默认
+
+          resources:
+            limits:
+              shmSize: 2Gi
+
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: TEMPORAL_ADDRESS
+              value: "localhost:7233"
+            - name: LUMIN_MCP_SERVER_URL
+              value: "http://localhost:8082"
+
+          ports:
+            - containerPort: 8082
+              name: mcp
+            - containerPort: 8083
+              name: playwright
+            - containerPort: 3457
+              name: dashboard
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+          volumeMounts:
+            - name: lumin-config
+              mountPath: /app/configs/lumin.yaml
+              subPath: lumin.yaml
+            - name: audit-logs
+              mountPath: /app/audit-logs
+            - name: repos
+              mountPath: /app/repos
+            - name: deliverables
+              mountPath: /app/deliverables
+
+      hostIPC: true
+
+      volumes:
+        - name: lumin-config
+          configMap:
+            name: lumin-config
+        - name: audit-logs
+          emptyDir: {}
+        - name: repos
+          emptyDir: {}
+        - name: deliverables
+          emptyDir: {}

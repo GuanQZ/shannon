@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lumin-worker
+  labels:
+    app: lumin-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lumin-worker
+  template:
+    metadata:
+      labels:
+        app: lumin-worker
+    spec:
+      # 安全上下文配置
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+
+      # 容器配置
+      containers:
+        - name: worker
+          image: ghcr.io/guanqz/lumin:latest
+          imagePullPolicy: Always
+
+          # K8s 权限配置
+          securityContext:
+            privileged: true
+            capabilities:
+              add:
+                - NET_RAW
+            seLinuxOptions: ""
+            seccompProfile:
+              type: Unconfined
+
+          # 共享内存（Playwright 需要）
+          resources:
+            limits:
+              shmSize: 2Gi
+
+          # 环境变量
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: TEMPORAL_ADDRESS
+              value: "localhost:7233"
+            - name: LUMIN_MCP_SERVER_URL
+              value: "http://localhost:8082"
+            # 如下为可选环境变量（如果不用 ConfigMap）
+            # - name: INTERNAL_AGENT_BASE_URL
+            #   value: "http://internal-agent-service:8080"
+
+          # 端口
+          ports:
+            - containerPort: 8082
+              name: mcp
+            - containerPort: 8083
+              name: playwright
+            - containerPort: 3457
+              name: dashboard
+
+          # 健康检查
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # 配置挂载
+          volumeMounts:
+            - name: lumin-config
+              mountPath: /app/configs/lumin.yaml
+              subPath: lumin.yaml
+            - name: audit-logs
+              mountPath: /app/audit-logs
+            - name: repos
+              mountPath: /app/repos
+            - name: deliverables
+              mountPath: /app/deliverables
+
+      # 启用 hostIPC（对应 docker-compose ipc: host）
+      hostIPC: true
+
+      # 卷配置
+      volumes:
+        - name: lumin-config
+          configMap:
+            name: lumin-config
+        - name: audit-logs
+          emptyDir: {}
+        - name: repos
+          emptyDir: {}
+        - name: deliverables
+          emptyDir: {}
