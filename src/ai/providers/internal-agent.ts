@@ -170,31 +170,32 @@ export interface ChatResponse {
  * 从环境变量加载内网 Agent 配置
  */
 export function loadInternalAgentConfig(): InternalAgentConfig | null {
-  const baseUrl = process.env.INTERNAL_AGENT_BASE_URL;
+  // 加载运行时配置
+  const runtimeConfig = loadLuminRuntimeConfig();
+  const iaConfig = runtimeConfig.internalAgent;
+
+  // 优先从 lumin.yaml 读取，fallback 到环境变量
+  const baseUrl = iaConfig?.baseUrl || process.env.INTERNAL_AGENT_BASE_URL;
 
   if (!baseUrl) {
     return null;
   }
 
-  // 加载运行时配置
-  const runtimeConfig = loadLuminRuntimeConfig();
-  const timeout = runtimeConfig.internalAgent?.timeout || 120000; // 默认 2 分钟
-
   const config: InternalAgentConfig = {
     baseUrl: baseUrl.replace(/\/$/, ''), // 移除末尾斜杠
     initSession: {
-      appId: process.env.INTERNAL_AGENT_INIT_SESSION_APP_ID || '',
-      trCode: process.env.INTERNAL_AGENT_INIT_SESSION_TR_CODE || '',
-      trVersion: process.env.INTERNAL_AGENT_INIT_SESSION_TR_VERSION || '1.0',
-      agentId: process.env.INTERNAL_AGENT_INIT_SESSION_AGENT_ID || '',
+      appId: iaConfig?.initSession?.appId || process.env.INTERNAL_AGENT_INIT_SESSION_APP_ID || '',
+      trCode: iaConfig?.initSession?.trCode || process.env.INTERNAL_AGENT_INIT_SESSION_TR_CODE || '',
+      trVersion: iaConfig?.initSession?.trVersion || process.env.INTERNAL_AGENT_INIT_SESSION_TR_VERSION || '1.0',
+      agentId: iaConfig?.initSession?.agentId || process.env.INTERNAL_AGENT_INIT_SESSION_AGENT_ID || '',
     },
     chat: {
-      appId: process.env.INTERNAL_AGENT_CHAT_APP_ID || '',
-      trCode: process.env.INTERNAL_AGENT_CHAT_TR_CODE || '',
-      trVersion: process.env.INTERNAL_AGENT_CHAT_TR_VERSION || '1.0',
-      stream: process.env.INTERNAL_AGENT_CHAT_STREAM === 'true',
+      appId: iaConfig?.chat?.appId || process.env.INTERNAL_AGENT_CHAT_APP_ID || '',
+      trCode: iaConfig?.chat?.trCode || process.env.INTERNAL_AGENT_CHAT_TR_CODE || '',
+      trVersion: iaConfig?.chat?.trVersion || process.env.INTERNAL_AGENT_CHAT_TR_VERSION || '1.0',
+      stream: iaConfig?.chat?.stream ?? (process.env.INTERNAL_AGENT_CHAT_STREAM === 'true'),
     },
-    timeout,
+    timeout: iaConfig?.timeout || 120000,
   };
 
   return config;
