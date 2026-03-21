@@ -1,0 +1,29 @@
+# Lumin Runtime Configuration
+# 全局运行时配置，适用于 K8s 部署通过 ConfigMap 挂载
+# 此配置文件不应包含任何目标特定的配置（目标配置在 configs/*.yaml 中）
+
+# Internal Agent 配置
+internalAgent:
+  # Internal Agent 服务地址
+  baseUrl: "http://internal-agent:8080"
+
+  # 会话初始化参数
+  initSession:
+    appId: "lumin-app"
+    agentId: "security-agent"
+    trCode: "security-scan"
+    trVersion: "1.0"
+
+  # 聊天请求参数
+  chat:
+    appId: "lumin-app"
+    trCode: "security-chat"
+    trVersion: "1.0"
+    stream: true
+
+  # SSE 请求超时时间（毫秒）
+  timeout: 1200000
+
+# 日志配置
+logging:
+  level: info
