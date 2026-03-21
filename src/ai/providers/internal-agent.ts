@@ -19,6 +19,67 @@
  */
 
 import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
+import yaml from 'js-yaml';
+
+interface LuminRuntimeConfig {
+  internalAgent?: {
+    baseUrl?: string;
+    initSession?: {
+      appId?: string;
+      agentId?: string;
+      trCode?: string;
+      trVersion?: string;
+    };
+    chat?: {
+      appId?: string;
+      trCode?: string;
+      trVersion?: string;
+      stream?: boolean;
+    };
+    timeout?: number;
+  };
+  logging?: {
+    level?: string;
+    verboseToolCalls?: boolean;
+  };
+}
+
+let cachedRuntimeConfig: LuminRuntimeConfig | null = null;
+
+/**
+ * 加载 lumin.yaml 运行时配置
+ */
+function loadLuminRuntimeConfig(): LuminRuntimeConfig {
+  if (cachedRuntimeConfig) {
+    return cachedRuntimeConfig;
+  }
+
+  try {
+    const configPaths = [
+      path.resolve(process.cwd(), 'configs/lumin.yaml'),
+      path.resolve(process.cwd(), 'lumin.yaml'),
+      '/app/configs/lumin.yaml',
+      '/app/lumin.yaml',
+    ];
+
+    for (const configPath of configPaths) {
+      if (fs.existsSync(configPath)) {
+        const content = fs.readFileSync(configPath, 'utf8');
+        cachedRuntimeConfig = yaml.load(content) as LuminRuntimeConfig;
+        console.log(`[InternalAgent] Loaded runtime config from: ${configPath}`);
+        return cachedRuntimeConfig || {};
+      }
+    }
+
+    console.log('[InternalAgent] No runtime config file found, using defaults');
+  } catch (error) {
+    console.warn(`[InternalAgent] Failed to load runtime config: ${error}`);
+  }
+
+  return {};
+}
 
 export interface InternalAgentConfig {
   baseUrl: string;
@@ -34,6 +95,7 @@ export interface InternalAgentConfig {
     trVersion: string;
     stream: boolean;
   };
+  timeout: number;
 }
 
 export interface InitSessionResponse {
@@ -114,6 +176,10 @@ export function loadInternalAgentConfig(): InternalAgentConfig | null {
     return null;
   }
 
+  // 加载运行时配置
+  const runtimeConfig = loadLuminRuntimeConfig();
+  const timeout = runtimeConfig.internalAgent?.timeout || 120000; // 默认 2 分钟
+
   const config: InternalAgentConfig = {
     baseUrl: baseUrl.replace(/\/$/, ''), // 移除末尾斜杠
     initSession: {
@@ -128,6 +194,7 @@ export function loadInternalAgentConfig(): InternalAgentConfig | null {
       trVersion: process.env.INTERNAL_AGENT_CHAT_TR_VERSION || '1.0',
       stream: process.env.INTERNAL_AGENT_CHAT_STREAM === 'true',
     },
+    timeout,
   };
 
   return config;
@@ -237,6 +304,35 @@ export class InternalAgentClient {
   }
 
   /**
+   * 带超时的 fetch 请求
+   */
+  private async fetchWithTimeout(
+    url: string,
+    options: RequestInit = {}
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      console.log(`[InternalAgent] Request timeout after ${this.config.timeout}ms: ${url}`);
+      controller.abort();
+    }, this.config.timeout);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      return response;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Request timeout after ${this.config.timeout}ms`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  /**
    * 初始化会话，获取 session_id
    */
   async initSession(): Promise<string> {
@@ -256,7 +352,7 @@ export class InternalAgentClient {
     console.log(`[InternalAgent] Calling init_session: ${url}`);
     console.log(`[InternalAgent] Request body: ${JSON.stringify(body)}`);
 
-    const response = await fetch(url, {
+    const response = await this.fetchWithTimeout(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -290,8 +386,10 @@ export class InternalAgentClient {
 
   /**
    * 发送聊天消息
+   * @param prompt - 聊天提示词
+   * @param onMessage - 可选的流式回调，每收到一条消息时调用
    */
-  async chat(prompt: string): Promise<ChatResponse> {
+  async chat(prompt: string, onMessage?: (message: ChatMessage) => void | Promise<void>): Promise<ChatResponse> {
     if (!this.sessionId) {
       throw new Error('Session not initialized. Call initSession() first.');
     }
@@ -316,7 +414,7 @@ export class InternalAgentClient {
     console.log(`[InternalAgent] Calling chat: ${url}`);
     console.log(`[InternalAgent] Prompt length: ${prompt.length} chars`);
 
-    const response = await fetch(url, {
+    const response = await this.fetchWithTimeout(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -351,12 +449,21 @@ export class InternalAgentClient {
         if (event.event === 'message') {
           // Handle AIMessageChunk (can have both text content AND tool_calls)
           if (msgType === 'AIMessageChunk') {
-            // First, log any text content as regular response
-            if (eventData.content) {
+            // First, send text content via callback for real-time logging
+            if (eventData.content && eventData.content.trim()) {
               result += eventData.content;
+
+              // Stream callback for text content (separate from tool_calls)
+              if (onMessage) {
+                const textMessage: ChatMessage = {
+                  role: 'assistant',
+                  content: eventData.content,
+                };
+                await onMessage(textMessage);
+              }
             }
 
-            // Then, log tool_calls separately if present
+            // Then, send tool_calls separately if present
             if (eventData.tool_calls && eventData.tool_calls.length > 0) {
               for (const toolCall of eventData.tool_calls) {
                 console.log(`[InternalAgent] Tool call: ${toolCall.name}`);
@@ -375,7 +482,7 @@ export class InternalAgentClient {
                 });
 
                 // Add tool_use message for audit logging (dashboard format)
-                messages.push({
+                const toolUseMessage: ChatMessage = {
                   role: 'assistant',
                   content: JSON.stringify({
                     type: 'tool_use',
@@ -387,7 +494,13 @@ export class InternalAgentClient {
                     name: toolCall.name,
                     input: args,
                   },
-                });
+                };
+                messages.push(toolUseMessage);
+
+                // Stream callback for real-time processing
+                if (onMessage) {
+                  await onMessage(toolUseMessage);
+                }
               }
             }
           } else if (msgType === 'function') {
@@ -399,7 +512,7 @@ export class InternalAgentClient {
 
             console.log(`[InternalAgent] Tool result: ${toolName}, hasName: ${!!eventData.name}`);
 
-            messages.push({
+            const toolResultMessage: ChatMessage = {
               role: 'user',
               content: JSON.stringify({
                 type: 'tool_result',
@@ -410,11 +523,26 @@ export class InternalAgentClient {
                 name: toolName,
                 output: toolOutput,
               },
-            });
+            };
+            messages.push(toolResultMessage);
+
+            // Stream callback for real-time processing
+            if (onMessage) {
+              await onMessage(toolResultMessage);
+            }
           } else {
             // Regular text content (non-AIMessageChunk)
             if (eventData.content) {
               result += eventData.content;
+
+              // Stream callback for text content
+              if (onMessage && eventData.content.trim()) {
+                const textMessage: ChatMessage = {
+                  role: 'assistant',
+                  content: eventData.content,
+                };
+                await onMessage(textMessage);
+              }
             }
           }
         }
