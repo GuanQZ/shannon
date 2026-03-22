@@ -3,6 +3,7 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import express from 'express';
 import cors from 'cors';
+import { execSync } from 'child_process';
 import { sdkTools } from './tools/sdk-tools.js';
 
 // In-memory todo store (simple global store for now)
@@ -181,9 +182,46 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Health check endpoint
+// Health check endpoint - checks all critical processes
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', server: 'lumin-tool-mcp' });
+  const checks = {
+    mcpServer: true, // This is the current process
+    temporalWorker: false,
+    dashboard: false,
+    playwrightMcp: false,
+  };
+
+  try {
+    // Check if temporal worker is running
+    const temporalProcess = execSync('pgrep -f "node.*temporal/worker"', { encoding: 'utf8' });
+    checks.temporalWorker = !!temporalProcess.trim();
+  } catch {
+    checks.temporalWorker = false;
+  }
+
+  try {
+    // Check if dashboard is running
+    const dashboardProcess = execSync('pgrep -f "node.*dashboard/server"', { encoding: 'utf8' });
+    checks.dashboard = !!dashboardProcess.trim();
+  } catch {
+    checks.dashboard = false;
+  }
+
+  try {
+    // Check if playwright-mcp is running
+    const playwrightProcess = execSync('pgrep -f "playwright-mcp"', { encoding: 'utf8' });
+    checks.playwrightMcp = !!playwrightProcess.trim();
+  } catch {
+    checks.playwrightMcp = false;
+  }
+
+  const allHealthy = checks.mcpServer && checks.temporalWorker && checks.dashboard && checks.playwrightMcp;
+
+  res.status(allHealthy ? 200 : 503).json({
+    status: allHealthy ? 'ok' : 'degraded',
+    server: 'lumin-tool-mcp',
+    processes: checks,
+  });
 });
 
 // Set working directory endpoint - allows dynamic update of BASE_DIR
