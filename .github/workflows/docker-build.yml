@@ -56,11 +56,9 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           # Save image as tar file for offline use
-          # Use lowercase image name (docker requires lowercase)
-          IMAGE_NAME=${{ env.REGISTRY }}/${{ github.repository }}:${{ github.run_number }}
-          # Convert to lowercase
-          IMAGE_NAME_LOWER=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
-          docker save -o lumin-amd64.tar $IMAGE_NAME_LOWER
+          # Use IMAGE_NAME env variable (already lowercase)
+          IMAGE_NAME=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.run_number }}
+          docker save -o lumin-amd64.tar $IMAGE_NAME
 
       - name: Upload artifact
         if: github.event_name != 'pull_request'
@@ -85,5 +83,5 @@ jobs:
           echo "To tag for your internal registry:"
           echo "```bash"
           docker load -i lumin-amd64.tar
-          docker tag ghcr.io/guanqz/lumin:${{ github.run_number }} your-internal-registry/lumin:latest
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.run_number }} your-internal-registry/lumin:latest
           echo "```"
