@@ -8,6 +8,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout repository
@@ -16,41 +19,31 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          load: true
-          tags: lumin-local:latest
+          push: true
+          tags: ghcr.io/guanqz/lumin:latest
           platforms: linux/amd64
           file: ./Dockerfile
 
-      - name: Save image to tar
-        run: |
-          docker save -o lumin-amd64.tar lumin-local:latest
-          echo "Image size:"
-          ls -lh lumin-amd64.tar
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-image
-          path: lumin-amd64.tar
-          retention-days: 7
-
-      - name: Print download instructions
+      - name: Print image info
         run: |
           echo "## Build Complete"
           echo ""
-          echo "Download the image from the Artifacts section above."
+          echo "Image: ghcr.io/guanqz/lumin:latest"
           echo ""
-          echo "To load the image on your machine:"
+          echo "To pull and tag for your internal registry:"
           echo "```bash"
-          echo "docker load -i lumin-amd64.tar"
-          echo "```"
-          echo ""
-          echo "To tag for your internal registry:"
-          echo "```bash"
-          docker load -i lumin-amd64.tar
-          docker tag lumin-local:latest your-internal-registry/lumin:latest
+          echo "docker pull ghcr.io/guanqz/lumin:latest"
+          echo "docker tag ghcr.io/guanqz/lumin:latest your-internal-registry/lumin:latest"
+          echo "docker push your-internal-registry/lumin:latest"
           echo "```"
