@@ -56,15 +56,16 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           # Save image as tar file for offline use
+          # Use simple filename without slashes
           IMAGE_NAME=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.run_number }}
-          docker save -o lumin-${{ env.IMAGE_NAME }}-amd64.tar $IMAGE_NAME
+          docker save -o lumin-amd64.tar $IMAGE_NAME
 
       - name: Upload artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: docker-image
-          path: lumin-${{ env.IMAGE_NAME }}-amd64.tar
+          path: lumin-amd64.tar
           retention-days: 7
 
       - name: Print download instructions
@@ -76,11 +77,11 @@ jobs:
           echo ""
           echo "To load the image on your machine:"
           echo "```bash"
-          echo "docker load -i lumin-${{ env.IMAGE_NAME }}-amd64.tar"
+          echo "docker load -i lumin-amd64.tar"
           echo "```"
           echo ""
           echo "To tag for your internal registry:"
           echo "```bash"
-          docker load -i lumin-${{ env.IMAGE_NAME }}-amd64.tar
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.run_number }} your-internal-registry/lumin:latest
+          docker load -i lumin-amd64.tar
+          docker tag ghcr.io/guanqz/lumin:${{ github.run_number }} your-internal-registry/lumin:latest
           echo "```"
