@@ -56,9 +56,11 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           # Save image as tar file for offline use
-          # Use IMAGE_NAME env variable (already lowercase)
-          IMAGE_NAME=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.run_number }}
-          docker save -o lumin-amd64.tar $IMAGE_NAME
+          # Use the tag from metadata (feature-internal-agent)
+          IMAGE_NAME=${{ steps.meta.outputs.tags }}
+          # Take the first tag
+          FIRST_TAG=$(echo "$IMAGE_NAME" | cut -d',' -f1)
+          docker save -o lumin-amd64.tar $FIRST_TAG
 
       - name: Upload artifact
         if: github.event_name != 'pull_request'
@@ -83,5 +85,5 @@ jobs:
           echo "To tag for your internal registry:"
           echo "```bash"
           docker load -i lumin-amd64.tar
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.run_number }} your-internal-registry/lumin:latest
+          docker tag ${{ steps.meta.outputs.tags }} your-internal-registry/lumin:latest
           echo "```"
