@@ -40,6 +40,7 @@ jobs:
             type=ref,event=branch
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ github.run_number }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -48,7 +49,38 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # cache-from: type=gha
-          # cache-to: type=gha,mode=max
           platforms: linux/amd64
           file: ./Dockerfile
+
+      - name: Download image to tar
+        if: github.event_name != 'pull_request'
+        run: |
+          # Save image as tar file for offline use
+          IMAGE_NAME=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.run_number }}
+          docker save -o lumin-${{ env.IMAGE_NAME }}-amd64.tar $IMAGE_NAME
+
+      - name: Upload artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: lumin-${{ env.IMAGE_NAME }}-amd64.tar
+          retention-days: 7
+
+      - name: Print download instructions
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "## Build Complete"
+          echo ""
+          echo "Download the image from the Artifacts section above."
+          echo ""
+          echo "To load the image on your machine:"
+          echo "```bash"
+          echo "docker load -i lumin-${{ env.IMAGE_NAME }}-amd64.tar"
+          echo "```"
+          echo ""
+          echo "To tag for your internal registry:"
+          echo "```bash"
+          docker load -i lumin-${{ env.IMAGE_NAME }}-amd64.tar
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.run_number }} your-internal-registry/lumin:latest
+          echo "```"
