@@ -40,7 +40,7 @@ jobs:
             type=ref,event=branch
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ github.run_number }}
+            type=raw,value=${{ github.sha }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -55,12 +55,8 @@ jobs:
       - name: Download image to tar
         if: github.event_name != 'pull_request'
         run: |
-          # Save image as tar file for offline use
-          # Use the tag from metadata (feature-internal-agent)
-          IMAGE_NAME=${{ steps.meta.outputs.tags }}
-          # Take the first tag
-          FIRST_TAG=$(echo "$IMAGE_NAME" | cut -d',' -f1)
-          docker save -o lumin-amd64.tar $FIRST_TAG
+          # Save image as tar file - use sha tag for consistency
+          docker save -o lumin-amd64.tar ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
       - name: Upload artifact
         if: github.event_name != 'pull_request'
@@ -85,5 +81,5 @@ jobs:
           echo "To tag for your internal registry:"
           echo "```bash"
           docker load -i lumin-amd64.tar
-          docker tag ${{ steps.meta.outputs.tags }} your-internal-registry/lumin:latest
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} your-internal-registry/lumin:latest
           echo "```"
