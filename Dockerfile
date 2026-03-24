@@ -66,6 +66,11 @@ RUN gem install addressable
 COPY --from=builder /usr/lib/python3.*/site-packages /usr/lib/python3.12/site-packages
 COPY --from=builder /usr/bin/schemathesis /usr/bin/
 
+# Install Temporal CLI for embedded Temporal server
+RUN curl -sL https://temporal.io/install.sh | sh && \
+    mv temporal /usr/local/bin/ && \
+    chmod +x /usr/local/bin/temporal
+
 # Create non-root user for security
 RUN addgroup -g 1001 pentest && \
     adduser -u 1001 -G pentest -s /bin/bash -D pentest
@@ -162,7 +167,7 @@ RUN git config --global user.email "Lumin@localhost" && \
     git config --global user.name "Lumin Agent" && \
     git config --global --add safe.directory '*'
 
-# Create startup script for K8s deployment
+# Create startup script for K8s deployment (with embedded Temporal)
 RUN echo '#!/bin/bash\n\
 set -e\n\
 \n\
@@ -172,6 +177,27 @@ echo "Starting Lumin services..."\n\
 mkdir -p /app/audit-logs\n\
 mkdir -p /app/repos\n\
 mkdir -p /app/deliverables\n\
+mkdir -p /app/temporal-data\n\
+\n\
+# Start Temporal server first (port 7233)\n\
+echo "Starting Temporal Server on port 7233..."\n\
+temporal server start-dev \\\n\
+  --db-filename /app/temporal-data/temporal.db \\\n\
+  --ip 0.0.0.0 \\\n\
+  --port 7233 &\n\
+TEMPORAL_PID=$!\n\
+\n\
+# Wait for Temporal to be ready (check with health API)\n\
+echo "Waiting for Temporal to be ready..."\n\
+for i in {1..30}; do\n\
+  if curl -sf http://localhost:7233/health 2>/dev/null || curl -sf http://localhost:8233 2>/dev/null; then\n\
+    echo "Temporal is ready!"\n\
+    break\n\
+  fi\n\
+  sleep 1\n\
+done\n\
+\n\
+sleep 2\n\
 \n\
 # Start MCP Server (port 8082)\n\
 echo "Starting MCP Server on port 8082..."\n\
@@ -189,20 +215,24 @@ PLAYWRIGHT_PID=$!\n\
 # Wait for Playwright to start\n\
 sleep 2\n\
 \n\
-# Start Temporal Worker\n\
+# Start Temporal Worker (connects to localhost:7233)\n\
 echo "Starting Temporal Worker..."\n\
-node /app/dist/temporal/worker.js &\n\
-TEMPORAL_PID=$!\n\
+TEMPORAL_ADDRESS=localhost:7233 node /app/dist/temporal/worker.js &\n\
+WORKER_PID=$!\n\
 \n\
 # Start Dashboard (port 3457)\n\
 echo "Starting Dashboard on port 3457..."\n\
-node /app/dashboard/server.js &\n\
+TEMPORAL_ADDRESS=localhost:7233 node /app/dashboard/server.js &\n\
 DASHBOARD_PID=$!\n\
 \n\
-echo "All services started!"\n\
-echo "MCP Server: http://localhost:8082"\n\
-echo "Playwright MCP: http://localhost:8083"\n\
-echo "Dashboard: http://localhost:3457"\n\
+echo "=========================================="\n\
+echo "All Lumin services started successfully!"\n\
+echo "Temporal Server:  http://localhost:7233"\n\
+echo "Temporal Web UI:  http://localhost:8233"\n\
+echo "MCP Server:       http://localhost:8082/health"\n\
+echo "Playwright MCP:   http://localhost:8083"\n\
+echo "Dashboard:        http://localhost:3457"\n\
+echo "=========================================="\n\
 \n\
 # Wait for all processes\n\
 wait' > /app/start.sh && chmod +x /app/start.sh
