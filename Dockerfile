@@ -162,5 +162,50 @@ RUN git config --global user.email "Lumin@localhost" && \
     git config --global user.name "Lumin Agent" && \
     git config --global --add safe.directory '*'
 
-# Set entrypoint
-ENTRYPOINT ["node", "dist/lumin.js"]
+# Create startup script for K8s deployment
+RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
+echo "Starting Lumin services..."\n\
+\n\
+# Create required directories\n\
+mkdir -p /app/audit-logs\n\
+mkdir -p /app/repos\n\
+mkdir -p /app/deliverables\n\
+\n\
+# Start MCP Server (port 8082)\n\
+echo "Starting MCP Server on port 8082..."\n\
+node /app/lumin-tool-mcp/dist/http-server.js &\n\
+MCP_PID=$!\n\
+\n\
+# Wait for MCP to start\n\
+sleep 3\n\
+\n\
+# Start Playwright MCP (port 8083)\n\
+echo "Starting Playwright MCP on port 8083..."\n\
+playwright-mcp --port 8083 --host 0.0.0.0 --allowed-hosts "*" --headless --executable-path /usr/bin/chromium-browser --no-sandbox --output-dir /app/repos &\n\
+PLAYWRIGHT_PID=$!\n\
+\n\
+# Wait for Playwright to start\n\
+sleep 2\n\
+\n\
+# Start Temporal Worker\n\
+echo "Starting Temporal Worker..."\n\
+node /app/dist/temporal/worker.js &\n\
+TEMPORAL_PID=$!\n\
+\n\
+# Start Dashboard (port 3457)\n\
+echo "Starting Dashboard on port 3457..."\n\
+node /app/dashboard/server.js &\n\
+DASHBOARD_PID=$!\n\
+\n\
+echo "All services started!"\n\
+echo "MCP Server: http://localhost:8082"\n\
+echo "Playwright MCP: http://localhost:8083"\n\
+echo "Dashboard: http://localhost:3457"\n\
+\n\
+# Wait for all processes\n\
+wait' > /app/start.sh && chmod +x /app/start.sh
+
+# Set entrypoint to use the startup script
+ENTRYPOINT ["/app/start.sh"]
