@@ -148,6 +148,10 @@ RUN mkdir -p /app/sessions /app/deliverables /app/repos /app/configs && \
     chmod 777 /tmp/.npm && \
     chown -R pentest:pentest /app
 
+# Copy startup script for K8s deployment (before switching to non-root user)
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
 # Switch to non-root user
 USER pentest
 
@@ -167,10 +171,6 @@ ENV XDG_CONFIG_HOME=/tmp/.config
 RUN git config --global user.email "Lumin@localhost" && \
     git config --global user.name "Lumin Agent" && \
     git config --global --add safe.directory '*'
-
-# Copy startup script for K8s deployment
-COPY start.sh /app/start.sh
-RUN chmod +x /app/start.sh
 
 # Set entrypoint to use the startup script
 ENTRYPOINT ["/app/start.sh"]
