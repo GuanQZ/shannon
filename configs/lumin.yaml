@@ -33,10 +33,17 @@ temporal:
 
 # MCP Server 配置
 mcp:
-  # MCP Server 服务地址
-  # 单容器模式: http://localhost:8082
-  # 多容器模式/外部: http://mcp:8082 或其他服务地址
+  # MCP Server 服务地址（Worker 内部连接用）
   url: "http://localhost:8082"
+
+# 服务端口配置
+server:
+  # MCP Server 暴露端口（外部 MCP 客户端连接）
+  mcpPort: 8082
+  # Playwright MCP 暴露端口（外部 MCP 客户端连接）
+  playwrightPort: 8083
+  # Dashboard 端口
+  dashboardPort: 3457
 
 # 日志配置
 logging:

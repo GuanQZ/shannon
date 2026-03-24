@@ -194,15 +194,15 @@ echo "Waiting for Temporal to be ready..."\n\
 sleep 10\n\
 \n\
 # Start MCP Server (port 8082)\n\
-echo "Starting MCP Server on port 8082..."\n\
-node /app/lumin-tool-mcp/dist/http-server.js &\n\
+echo "Starting MCP Server on port ${MCP_PORT:-8082}..."\n\
+PORT=${MCP_PORT:-8082} node /app/lumin-tool-mcp/dist/http-server.js &\n\
 MCP_PID=$!\n\
 \n\
 sleep 3\n\
 \n\
 # Start Playwright MCP (port 8083)\n\
-echo "Starting Playwright MCP on port 8083..."\n\
-playwright-mcp --port 8083 --host 0.0.0.0 --allowed-hosts "*" --headless --executable-path /usr/bin/chromium-browser --no-sandbox --output-dir /app/repos &\n\
+echo "Starting Playwright MCP on port ${PLAYWRIGHT_PORT:-8083}..."\n\
+playwright-mcp --port ${PLAYWRIGHT_PORT:-8083} --host 0.0.0.0 --allowed-hosts "*" --headless --executable-path /usr/bin/chromium-browser --no-sandbox --output-dir /app/repos &\n\
 PLAYWRIGHT_PID=$!\n\
 \n\
 sleep 2\n\
@@ -213,17 +213,17 @@ TEMPORAL_ADDRESS=localhost:7233 node /app/dist/temporal/worker.js &\n\
 WORKER_PID=$!\n\
 \n\
 # Start Dashboard (port 3457)\n\
-echo "Starting Dashboard on port 3457..."\n\
-TEMPORAL_ADDRESS=localhost:7233 node /app/dashboard/server.js &\n\
+echo "Starting Dashboard on port ${DASHBOARD_PORT:-3457}..."\n\
+PORT=${DASHBOARD_PORT:-3457} TEMPORAL_ADDRESS=localhost:7233 node /app/dashboard/server.js &\n\
 DASHBOARD_PID=$!\n\
 \n\
 echo "=========================================="\n\
 echo "All Lumin services started successfully!"\n\
 echo "Temporal Server:  http://localhost:7233"\n\
 echo "Temporal Web:    http://localhost:8233"\n\
-echo "MCP Server:      http://localhost:8082/health"\n\
-echo "Playwright MCP:  http://localhost:8083"\n\
-echo "Dashboard:       http://localhost:3457"\n\
+echo "MCP Server:      http://localhost:${MCP_PORT:-8082}/health"\n\
+echo "Playwright MCP:  http://localhost:${PLAYWRIGHT_PORT:-8083}"\n\
+echo "Dashboard:       http://localhost:${DASHBOARD_PORT:-3457}"\n\
 echo "=========================================="\n\
 \n\
 wait' > /app/start.sh && chmod +x /app/start.sh
