@@ -35,6 +35,20 @@ jobs:
           platforms: linux/amd64
           file: ./Dockerfile
 
+      - name: Verify start.sh content
+        run: |
+          # Check that start.sh has proper newlines (not literal \n)
+          START_CONTENT=$(docker run --rm ghcr.io/guanqz/lumin:1.0.0 cat /app/start.sh | head -3)
+          echo "First 3 lines of start.sh:"
+          echo "$START_CONTENT"
+          echo ""
+          # Verify no literal \n in the shebang line
+          if echo "$START_CONTENT" | grep -q '\\\\n'; then
+            echo "ERROR: start.sh contains literal \\n instead of newlines!"
+            exit 1
+          fi
+          echo "✓ start.sh looks correct"
+
       - name: Export image to tar
         run: |
           docker save ghcr.io/guanqz/lumin:1.0.0 -o /tmp/lumin.tar
