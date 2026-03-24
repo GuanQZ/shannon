@@ -66,11 +66,11 @@ RUN gem install addressable
 COPY --from=builder /usr/lib/python3.*/site-packages /usr/lib/python3.12/site-packages
 COPY --from=builder /usr/bin/schemathesis /usr/bin/
 
-# Download Temporal CLI binary directly (avoid install.sh issues)
-RUN curl -sL -o /tmp/temporal.zip https://temporal.io/downloads/temporal-cli/latest/temporal_amd64_linux.zip && \
-    unzip -o /tmp/temporal.zip -d /usr/local/bin/ && \
+# Download Temporal CLI binary from GitHub releases
+RUN curl -sL -o /tmp/temporal.tar.gz https://github.com/temporalio/cli/releases/download/v1.6.1/temporal_cli_1.6.1_linux_amd64.tar.gz && \
+    tar -xzf /tmp/temporal.tar.gz -C /usr/local/bin/ temporal && \
     chmod +x /usr/local/bin/temporal && \
-    rm /tmp/temporal.zip
+    rm /tmp/temporal.tar.gz
 
 # Create non-root user for security
 RUN addgroup -g 1001 pentest && \
