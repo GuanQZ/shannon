@@ -26,14 +26,31 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
+          load: true
           tags: ghcr.io/guanqz/lumin:1.0.0,ghcr.io/guanqz/lumin:latest
           platforms: linux/amd64
           file: ./Dockerfile
+
+      - name: Export image to tar
+        run: |
+          docker save ghcr.io/guanqz/lumin:1.0.0 -o /tmp/lumin.tar
+          ls -lh /tmp/lumin.tar
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumin-image
+          path: /tmp/lumin.tar
+          retention-days: 7
+
+      - name: Push to GitHub Container Registry
+        run: |
+          docker push ghcr.io/guanqz/lumin:1.0.0
+          docker push ghcr.io/guanqz/lumin:latest
 
       - name: Print image info
         run: |
