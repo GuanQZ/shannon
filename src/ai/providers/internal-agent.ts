@@ -43,6 +43,9 @@ interface LuminRuntimeConfig {
   temporal?: {
     address?: string;
   };
+  mcp?: {
+    url?: string;
+  };
   logging?: {
     level?: string;
     verboseToolCalls?: boolean;
@@ -176,6 +179,15 @@ export interface ChatResponse {
 export function getTemporalAddress(): string {
   const runtimeConfig = loadLuminRuntimeConfig();
   return runtimeConfig.temporal?.address || process.env.TEMPORAL_ADDRESS || 'localhost:7233';
+}
+
+/**
+ * 获取 MCP Server 地址
+ * 优先从 lumin.yaml 读取，fallback 到环境变量 LUMIN_MCP_SERVER_URL
+ */
+export function getMcpUrl(): string {
+  const runtimeConfig = loadLuminRuntimeConfig();
+  return runtimeConfig.mcp?.url || process.env.LUMIN_MCP_SERVER_URL || 'http://localhost:8082';
 }
 
 /**

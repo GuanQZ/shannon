@@ -81,6 +81,7 @@ import {
 import { loadPrompt } from '../prompts/prompt-manager.js';
 import { parseConfig, distributeConfig } from '../config-parser.js';
 import { checkToolAvailability, type ToolAvailability } from '../tool-checker.js';
+import { getTemporalAddress, getMcpUrl } from '../ai/providers/internal-agent.js';
 import { executePreReconPhase } from '../phases/pre-recon.js';
 import { classifyErrorForTemporal } from '../error-handling.js';
 import {
@@ -185,7 +186,7 @@ async function runAgentActivity(
 
   // Update MCP BASE_DIR to current workflow's working directory
   // 在每个 agent 执行前更新 MCP 的工作目录，避免文件保存到错误目录
-  const mcpBaseUrl = process.env.LUMIN_MCP_SERVER_URL || 'http://localhost:8082';
+  const mcpBaseUrl = getMcpUrl();
   try {
     const updateRes = await fetch(`${mcpBaseUrl}/set-cwd`, {
       method: 'PUT',

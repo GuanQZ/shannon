@@ -31,6 +31,13 @@ temporal:
   # 多容器模式/外部: temporal:7233 或其他服务地址
   address: "localhost:7233"
 
+# MCP Server 配置
+mcp:
+  # MCP Server 服务地址
+  # 单容器模式: http://localhost:8082
+  # 多容器模式/外部: http://mcp:8082 或其他服务地址
+  url: "http://localhost:8082"
+
 # 日志配置
 logging:
   level: info
