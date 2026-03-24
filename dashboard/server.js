@@ -2,6 +2,32 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
+const yaml = require('js-yaml');
+
+// 加载 lumin.yaml 配置
+function getTemporalAddress() {
+  const configPaths = [
+    path.resolve(process.cwd(), 'configs/lumin.yaml'),
+    path.resolve(process.cwd(), 'lumin.yaml'),
+    '/app/configs/lumin.yaml',
+    '/app/lumin.yaml',
+  ];
+
+  for (const configPath of configPaths) {
+    if (fs.existsSync(configPath)) {
+      try {
+        const content = fs.readFileSync(configPath, 'utf8');
+        const config = yaml.load(content);
+        if (config?.temporal?.address) {
+          return config.temporal.address;
+        }
+      } catch (e) {
+        // ignore and continue
+      }
+    }
+  }
+  return process.env.TEMPORAL_ADDRESS || 'localhost:7233';
+}
 
 const PORT = process.env.PORT || 3457;
 const AUDIT_LOGS_DIR = path.join(__dirname, '..', 'audit-logs');
@@ -167,7 +193,7 @@ const server = http.createServer((req, res) => {
           return;
         }
         const { Connection, Client } = temporalClient;
-        const connection = await Connection.connect({ address: process.env.TEMPORAL_ADDRESS || 'temporal:7233' });
+        const connection = await Connection.connect({ address: getTemporalAddress() });
         const client = new Client({ connection });
 
         // 直接使用 sessionId 查询 workflow

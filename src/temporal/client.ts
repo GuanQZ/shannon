@@ -56,6 +56,7 @@ import dotenv from 'dotenv';
 import chalk from 'chalk';
 import { displaySplashScreen } from '../splash-screen.js';
 import { sanitizeHostname } from '../audit/utils.js';
+import { getTemporalAddress } from '../ai/providers/internal-agent.js';
 // Import types only - these don't pull in workflow runtime code
 // 仅导入类型，避免拉入工作流运行时代码。
 import type { PipelineInput, PipelineState, PipelineProgress } from './shared.js';
@@ -161,7 +162,7 @@ async function startPipeline(): Promise<void> {
   // Display splash screen。
   await displaySplashScreen();
 
-  const address = process.env.TEMPORAL_ADDRESS || 'localhost:7233';
+  const address = getTemporalAddress();
   console.log(chalk.gray(`正在连接 Temporal：${address}...`));
 
   const connection = await Connection.connect({ address });

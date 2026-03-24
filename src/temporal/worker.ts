@@ -46,6 +46,7 @@ import path from 'node:path';
 import dotenv from 'dotenv';
 import chalk from 'chalk';
 import * as activities from './activities.js';
+import { getTemporalAddress } from '../ai/providers/internal-agent.js';
 
 dotenv.config();
 
@@ -107,7 +108,7 @@ function setupGlobalErrorHandlers(): void {
 setupGlobalErrorHandlers();
 
 async function runWorker(): Promise<void> {
-  const address = process.env.TEMPORAL_ADDRESS || 'localhost:7233';
+  const address = getTemporalAddress();
   console.log(chalk.cyan(`正在连接 Temporal：${address}...`));
 
   const connection = await NativeConnection.connect({ address });

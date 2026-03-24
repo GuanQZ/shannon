@@ -40,6 +40,9 @@ interface LuminRuntimeConfig {
     };
     timeout?: number;
   };
+  temporal?: {
+    address?: string;
+  };
   logging?: {
     level?: string;
     verboseToolCalls?: boolean;
@@ -164,6 +167,15 @@ export interface ChatResponse {
   messages: ChatMessage[];  // All messages for audit logging
   success: boolean;
   chatId?: string | undefined;
+}
+
+/**
+ * 获取 Temporal 服务地址
+ * 优先从 lumin.yaml 读取，fallback 到环境变量 TEMPORAL_ADDRESS
+ */
+export function getTemporalAddress(): string {
+  const runtimeConfig = loadLuminRuntimeConfig();
+  return runtimeConfig.temporal?.address || process.env.TEMPORAL_ADDRESS || 'localhost:7233';
 }
 
 /**

@@ -41,6 +41,7 @@
 import { Connection, Client } from '@temporalio/client';
 import dotenv from 'dotenv';
 import chalk from 'chalk';
+import { getTemporalAddress } from '../ai/providers/internal-agent.js';
 
 dotenv.config();
 
@@ -115,7 +116,7 @@ async function queryWorkflow(): Promise<void> {
     process.exit(workflowId ? 0 : 1);
   }
 
-  const address = process.env.TEMPORAL_ADDRESS || 'localhost:7233';
+  const address = getTemporalAddress();
 
   const connection = await Connection.connect({ address });
   const client = new Client({ connection });

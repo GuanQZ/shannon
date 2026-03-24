@@ -24,6 +24,13 @@ internalAgent:
   # SSE 请求超时时间（毫秒）
   timeout: 1200000
 
+# Temporal 配置
+temporal:
+  # Temporal 服务地址
+  # 单容器模式: localhost:7233
+  # 多容器模式/外部: temporal:7233 或其他服务地址
+  address: "localhost:7233"
+
 # 日志配置
 logging:
   level: info
