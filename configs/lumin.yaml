@@ -36,13 +36,16 @@ mcp:
   # MCP Server 服务地址（Worker 内部连接用）
   url: "http://localhost:8082"
 
-# 服务端口配置
+# 服务端口配置（通过 start.sh 从配置文件读取）
 server:
   # MCP Server 暴露端口（外部 MCP 客户端连接）
+  # 可通过环境变量 MCP_PORT 覆盖
   mcpPort: 8082
   # Playwright MCP 暴露端口（外部 MCP 客户端连接）
+  # 可通过环境变量 PLAYWRIGHT_PORT 覆盖
   playwrightPort: 8083
   # Dashboard 端口
+  # 可通过环境变量 DASHBOARD_PORT 覆盖
   dashboardPort: 3457
 
 # 日志配置

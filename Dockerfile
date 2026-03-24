@@ -169,10 +169,30 @@ RUN git config --global user.email "Lumin@localhost" && \
     git config --global --add safe.directory '*'
 
 # Create startup script for K8s deployment (includes Temporal server)
+# Script reads port config from lumin.yaml, with env var override
 RUN echo '#!/bin/bash\n\
 set -e\n\
 \n\
 echo "Starting Lumin services..."\n\
+\n\
+# Read configuration from lumin.yaml\n\
+CONFIG_FILE="/app/configs/lumin.yaml"\n\
+if [ -f "$CONFIG_FILE" ]; then\n\
+  # Extract port configs using grep and sed (minimal dependencies)\n\
+  MCP_PORT_CONFIG=$(grep -E "^[[:space:]]*mcpPort:" "$CONFIG_FILE" | sed "s/.*mcpPort:[[:space:]]*//" | tr -d " \""")\n\
+  PLAYWRIGHT_PORT_CONFIG=$(grep -E "^[[:space:]]*playwrightPort:" "$CONFIG_FILE" | sed "s/.*playwrightPort:[[:space:]]*//" | tr -d " \""")\n\
+  DASHBOARD_PORT_CONFIG=$(grep -E "^[[:space:]]*dashboardPort:" "$CONFIG_FILE" | sed "s/.*dashboardPort:[[:space:]]*//" | tr -d " \""")\n\
+\n\
+  # Env vars override config file\n\
+  export MCP_PORT=${MCP_PORT:-$MCP_PORT_CONFIG}\n\
+  export PLAYWRIGHT_PORT=${PLAYWRIGHT_PORT:-$PLAYWRIGHT_PORT_CONFIG}\n\
+  export DASHBOARD_PORT=${DASHBOARD_PORT:-$DASHBOARD_PORT_CONFIG}\n\
+fi\n\
+\n\
+# Fallback defaults\n\
+export MCP_PORT=${MCP_PORT:-8082}\n\
+export PLAYWRIGHT_PORT=${PLAYWRIGHT_PORT:-8083}\n\
+export DASHBOARD_PORT=${DASHBOARD_PORT:-3457}\n\
 \n\
 # Create required directories\n\
 mkdir -p /app/audit-logs\n\
@@ -193,16 +213,16 @@ TEMPORAL_PID=$!\n\
 echo "Waiting for Temporal to be ready..."\n\
 sleep 10\n\
 \n\
-# Start MCP Server (port 8082)\n\
-echo "Starting MCP Server on port ${MCP_PORT:-8082}..."\n\
-PORT=${MCP_PORT:-8082} node /app/lumin-tool-mcp/dist/http-server.js &\n\
+# Start MCP Server\n\
+echo "Starting MCP Server on port ${MCP_PORT}..."\n\
+PORT=${MCP_PORT} node /app/lumin-tool-mcp/dist/http-server.js &\n\
 MCP_PID=$!\n\
 \n\
 sleep 3\n\
 \n\
-# Start Playwright MCP (port 8083)\n\
-echo "Starting Playwright MCP on port ${PLAYWRIGHT_PORT:-8083}..."\n\
-playwright-mcp --port ${PLAYWRIGHT_PORT:-8083} --host 0.0.0.0 --allowed-hosts "*" --headless --executable-path /usr/bin/chromium-browser --no-sandbox --output-dir /app/repos &\n\
+# Start Playwright MCP\n\
+echo "Starting Playwright MCP on port ${PLAYWRIGHT_PORT}..."\n\
+playwright-mcp --port ${PLAYWRIGHT_PORT} --host 0.0.0.0 --allowed-hosts "*" --headless --executable-path /usr/bin/chromium-browser --no-sandbox --output-dir /app/repos &\n\
 PLAYWRIGHT_PID=$!\n\
 \n\
 sleep 2\n\
@@ -212,18 +232,18 @@ echo "Starting Temporal Worker..."\n\
 TEMPORAL_ADDRESS=localhost:7233 node /app/dist/temporal/worker.js &\n\
 WORKER_PID=$!\n\
 \n\
-# Start Dashboard (port 3457)\n\
-echo "Starting Dashboard on port ${DASHBOARD_PORT:-3457}..."\n\
-PORT=${DASHBOARD_PORT:-3457} TEMPORAL_ADDRESS=localhost:7233 node /app/dashboard/server.js &\n\
+# Start Dashboard\n\
+echo "Starting Dashboard on port ${DASHBOARD_PORT}..."\n\
+PORT=${DASHBOARD_PORT} TEMPORAL_ADDRESS=localhost:7233 node /app/dashboard/server.js &\n\
 DASHBOARD_PID=$!\n\
 \n\
 echo "=========================================="\n\
 echo "All Lumin services started successfully!"\n\
 echo "Temporal Server:  http://localhost:7233"\n\
 echo "Temporal Web:    http://localhost:8233"\n\
-echo "MCP Server:      http://localhost:${MCP_PORT:-8082}/health"\n\
-echo "Playwright MCP:  http://localhost:${PLAYWRIGHT_PORT:-8083}"\n\
-echo "Dashboard:       http://localhost:${DASHBOARD_PORT:-3457}"\n\
+echo "MCP Server:      http://localhost:${MCP_PORT}/health"\n\
+echo "Playwright MCP:  http://localhost:${PLAYWRIGHT_PORT}"\n\
+echo "Dashboard:       http://localhost:${DASHBOARD_PORT}"\n\
 echo "=========================================="\n\
 \n\
 wait' > /app/start.sh && chmod +x /app/start.sh

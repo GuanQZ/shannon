@@ -31,7 +31,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/guanqz/lumin:1.0.0
+          tags: ghcr.io/guanqz/lumin:1.0.0,ghcr.io/guanqz/lumin:latest
           platforms: linux/amd64
           file: ./Dockerfile
 
@@ -39,11 +39,11 @@ jobs:
         run: |
           echo "## Build Complete"
           echo ""
-          echo "Image: ghcr.io/guanqz/lumin:latest"
+          echo "Image: ghcr.io/guanqz/lumin:1.0.0"
           echo ""
-          echo "To pull and tag for your internal registry:"
+          echo "To pull and use:"
           echo "```bash"
-          echo "docker pull ghcr.io/guanqz/lumin:latest"
-          echo "docker tag ghcr.io/guanqz/lumin:latest your-internal-registry/lumin:latest"
-          echo "docker push your-internal-registry/lumin:latest"
+          echo "docker pull ghcr.io/guanqz/lumin:1.0.0"
+          echo "docker tag ghcr.io/guanqz/lumin:1.0.0 your-registry/lumin:1.0.0"
+          echo "docker push your-registry/lumin:1.0.0"
           echo "```"

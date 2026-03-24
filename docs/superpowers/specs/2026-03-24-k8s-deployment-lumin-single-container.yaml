@@ -1,0 +1,235 @@
+# K8s Deployment - 单容器模式
+# 同一个容器内运行所有服务（Temporal、MCP、Playwright、Worker、Dashboard）
+# 通过 ConfigMap 挂载配置文件
+#
+# 配置文件说明：
+# - lumin.yaml: 运行时配置（temporal地址、端口、日志等）
+# - lumin-target.yaml: 渗透目标配置（登录凭证等）
+#
+# 使用方法：
+# 1. 修改本文件中的 lumin-target.yaml（目标配置）和 lumin.yaml（运行时配置）
+# 2. 部署: kubectl apply -f 2026-03-24-k8s-deployment-lumin-single-container.yaml
+# 3. 启动渗透测试:
+#    # 方式A: 在集群内部运行 client
+#    kubectl exec -it lumin-xxx -- sh
+#    cd /app
+#    ./lumin start URL=http://target:8080 REPO=my-repo CONFIG=/app/configs/lumin-target.yaml
+#
+#    # 方式B: 从本地运行（需要把 lumin.yaml 中的 temporal.address 改为集群 Service 地址）
+#    TEMPORAL_ADDRESS=lumin:7233 ./lumin start URL=http://target:8080 REPO=my-repo CONFIG=./configs/lumin-target.yaml
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lumin-config
+data:
+  # 运行时配置文件
+  lumin.yaml: |
+    # Lumin Runtime Configuration
+    # 运行时配置，通过 K8s ConfigMap 挂载
+
+    # Internal Agent 配置
+    internalAgent:
+      # Internal Agent 服务地址
+      baseUrl: "http://mock-server:3000"
+
+      # 会话初始化参数
+      initSession:
+        appId: "lumin-app"
+        agentId: "security-agent"
+        trCode: "security-scan"
+        trVersion: "1.0"
+
+      # chat请求参数
+      chat:
+        appId: "lumin-app"
+        trCode: "security-chat"
+        trVersion: "1.0"
+        stream: true
+
+      # SSE 请求超时时间（毫秒）
+      timeout: 1200000
+
+    # Temporal 配置
+    temporal:
+      # Temporal 服务地址（单容器模式用 localhost）
+      address: "localhost:7233"
+
+    # MCP Server 配置
+    mcp:
+      # MCP Server 地址（Worker 内部连接用）
+      url: "http://localhost:8082"
+
+    # 服务端口配置
+    server:
+      # MCP Server 暴露端口
+      mcpPort: 8082
+      # Playwright MCP 暴露端口
+      playwrightPort: 8083
+      # Dashboard 端口
+      dashboardPort: 3457
+
+    # 日志配置
+    logging:
+      level: info
+
+  # 渗透目标配置文件
+  lumin-target.yaml: |
+    # Lumin-target Configuration
+    # 渗透测试目标配置
+
+    authentication:
+      login_type: form
+      login_url: "http://host.docker.internal/login"
+      credentials:
+        username: "admin"
+        password: "password123"
+
+      # Login flow
+      login_flow:
+        - "Navigate to the login page"
+        - "Type $username into the username field"
+        - "Type $password into the password field"
+        - "Click the 'Login' button"
+
+      success_condition:
+        type: url_contains
+        value: "/dashboard"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lumin
+spec:
+  selector:
+    app: lumin
+  ports:
+    - name: mcp
+      port: 8082
+      targetPort: 8082
+    - name: playwright
+      port: 8083
+      targetPort: 8083
+    - name: dashboard
+      port: 3457
+      targetPort: 3457
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lumin
+  labels:
+    app: lumin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lumin
+  template:
+    metadata:
+      labels:
+        app: lumin
+    spec:
+      # 安全上下文配置
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+
+      # 容器配置
+      containers:
+        - name: lumin
+          image: ghcr.io/guanqz/lumin:1.0.0
+          imagePullPolicy: Always
+
+          # K8s 权限配置
+          securityContext:
+            privileged: true
+            capabilities:
+              add:
+                - NET_RAW
+            seLinuxOptions: ""
+            seccompProfile:
+              type: Unconfined
+
+          # 共享内存（Playwright 需要）
+          resources:
+            limits:
+              memory: 4Gi
+              shmSize: 2Gi
+            requests:
+              memory: 2Gi
+
+          # 环境变量（可选，如果 ConfigMap 中的配置不够用）
+          env:
+            - name: NODE_ENV
+              value: "production"
+            # 端口通过 lumin.yaml 配置，此处可选覆盖
+            # - name: MCP_PORT
+            #   value: "8082"
+            # - name: PLAYWRIGHT_PORT
+            #   value: "8083"
+            # - name: DASHBOARD_PORT
+            #   value: "3457"
+
+          # 端口（供 Service 发现）
+          ports:
+            - containerPort: 8082
+              name: mcp
+            - containerPort: 8083
+              name: playwright
+            - containerPort: 3457
+              name: dashboard
+
+          # 健康检查
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # 配置挂载
+          volumeMounts:
+            - name: lumin-config
+              mountPath: /app/configs/lumin.yaml
+              subPath: lumin.yaml
+            - name: lumin-config
+              mountPath: /app/configs/lumin-target.yaml
+              subPath: lumin-target.yaml
+            - name: audit-logs
+              mountPath: /app/audit-logs
+            - name: repos
+              mountPath: /app/repos
+            - name: deliverables
+              mountPath: /app/deliverables
+
+      # 启用 hostIPC（Playwright 需要）
+      hostIPC: true
+
+      # 卷配置
+      volumes:
+        - name: lumin-config
+          configMap:
+            name: lumin-config
+        - name: audit-logs
+          emptyDir: {}
+        - name: repos
+          emptyDir: {}
+        - name: deliverables
+          emptyDir: {}
