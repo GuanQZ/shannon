@@ -5,7 +5,7 @@
 # Internal Agent 配置
 internalAgent:
   # Internal Agent 服务地址
-  baseUrl: "http://internal-agent:8080"
+  baseUrl: "http://mock-server:3000"
 
   # 会话初始化参数
   initSession:
@@ -14,7 +14,7 @@ internalAgent:
     trCode: "security-scan"
     trVersion: "1.0"
 
-  # 聊天请求参数
+  # chat请求参数
   chat:
     appId: "lumin-app"
     trCode: "security-chat"

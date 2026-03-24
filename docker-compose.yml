@@ -16,6 +16,7 @@ services:
 
   worker:
     image: ghcr.io/guanqz/lumin:latest
+    restart: unless-stopped
     privileged: true
     entrypoint: >
       sh -c "mkdir -p /app/audit-logs &&
@@ -28,6 +29,7 @@ services:
     env_file:
       - .env
     environment:
+      - TZ=Asia/Shanghai
       - TEMPORAL_ADDRESS=temporal:7233
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-}

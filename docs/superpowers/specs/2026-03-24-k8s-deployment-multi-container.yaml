@@ -1,0 +1,199 @@
+# K8s Deployment - Multi-Container 模式
+# 同一个 Pod 内运行多个容器，通过 localhost 互访
+#
+# 启动顺序：
+# 1. temporal (port 7233) - 先启动
+# 2. mcp (port 8082)
+# 3. playwright (port 8083)
+# 4. worker (无端口)
+# 5. dashboard (port 3457)
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lumin-scripts
+data:
+  # Temporal 启动脚本
+  temporal-start.sh: |
+    #!/bin/bash
+    exec temporal server start-dev \
+      --db-filename /data/temporal.db \
+      --ip 0.0.0.0 \
+      --port 7233 \
+      --frontend-port 7233
+
+  # Worker 启动脚本
+  worker-start.sh: |
+    #!/bin/bash
+    exec node /app/dist/temporal/worker.js
+
+  # MCP 启动脚本
+  mcp-start.sh: |
+    #!/bin/bash
+    exec node /app/lumin-tool-mcp/dist/http-server.js
+
+  # Dashboard 启动脚本
+  dashboard-start.sh: |
+    #!/bin/bash
+    exec node /app/dashboard/server.js
+
+  # Playwright 启动脚本
+  playwright-start.sh: |
+    #!/bin/bash
+    exec playwright-mcp \
+      --port 8083 \
+      --host 0.0.0.0 \
+      --allowed-hosts '*' \
+      --headless \
+      --executable-path /usr/bin/chromium-browser \
+      --no-sandbox \
+      --output-dir /app/repos
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lumin-worker
+  labels:
+    app: lumin-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lumin-worker
+  template:
+    metadata:
+      labels:
+        app: lumin-worker
+    spec:
+      # 安全上下文配置
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+
+      # 共享内存（Playwright 需要）
+      containers:
+        # 1. Temporal Server (使用官方 Temporal 镜像)
+        - name: temporal
+          image: temporalio/temporal:latest
+          imagePullPolicy: Always
+          command: ["/bin/sh", "/scripts/temporal-start.sh"]
+          ports:
+            - containerPort: 7233
+              name: temporal-grpc
+            - containerPort: 8233
+              name: temporal-web
+          securityContext:
+            privileged: false
+            capabilities:
+              add: []
+          resources:
+            limits:
+              memory: 1Gi
+          volumeMounts:
+            - name: temporal-data
+              mountPath: /data
+            - name: lumin-scripts
+              mountPath: /scripts
+
+        # 2. MCP Server
+        - name: mcp
+          image: lumin:1.0.0
+          imagePullPolicy: Always
+          command: ["/bin/sh", "/scripts/mcp-start.sh"]
+          ports:
+            - containerPort: 8082
+              name: mcp
+          securityContext:
+            privileged: false
+          env:
+            - name: TEMPORAL_ADDRESS
+              value: "localhost:7233"
+          resources:
+            limits:
+              memory: 1Gi
+          volumeMounts:
+            - name: lumin-scripts
+              mountPath: /scripts
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+        # 3. Playwright MCP
+        - name: playwright
+          image: lumin:1.0.0
+          imagePullPolicy: Always
+          command: ["/bin/sh", "/scripts/playwright-start.sh"]
+          ports:
+            - containerPort: 8083
+              name: playwright
+          securityContext:
+            privileged: true
+          resources:
+            limits:
+              memory: 2Gi
+              shmSize: 2Gi
+          volumeMounts:
+            - name: repos
+              mountPath: /app/repos
+            - name: lumin-scripts
+              mountPath: /scripts
+
+        # 4. Temporal Worker
+        - name: worker
+          image: lumin:1.0.0
+          imagePullPolicy: Always
+          command: ["/bin/sh", "/scripts/worker-start.sh"]
+          securityContext:
+            privileged: false
+            capabilities:
+              add:
+                - NET_RAW
+          env:
+            - name: TEMPORAL_ADDRESS
+              value: "localhost:7233"
+            - name: NODE_ENV
+              value: "production"
+          resources:
+            limits:
+              memory: 2Gi
+
+        # 5. Dashboard
+        - name: dashboard
+          image: lumin:1.0.0
+          imagePullPolicy: Always
+          command: ["/bin/sh", "/scripts/dashboard-start.sh"]
+          ports:
+            - containerPort: 3457
+              name: dashboard
+          securityContext:
+            privileged: false
+          env:
+            - name: TEMPORAL_ADDRESS
+              value: "localhost:7233"
+            - name: NODE_ENV
+              value: "production"
+          resources:
+            limits:
+              memory: 512Mi
+
+      volumes:
+        - name: temporal-data
+          emptyDir: {}
+        - name: repos
+          emptyDir: {}
+        - name: lumin-scripts
+          configMap:
+            name: lumin-scripts
+            defaultMode: 0755
