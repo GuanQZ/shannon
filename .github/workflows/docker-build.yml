@@ -59,11 +59,23 @@ jobs:
           docker save ghcr.io/guanqz/lumin:amd64 -o /tmp/lumin-amd64.tar
           ls -lh /tmp/lumin-amd64.tar
 
-      - name: Upload artifact
+      - name: Upload artifact (amd64)
         uses: actions/upload-artifact@v4
         with:
           name: lumin-image-amd64
           path: /tmp/lumin-amd64.tar
+          retention-days: 7
+
+      - name: Export image to tar (arm64)
+        run: |
+          docker save ghcr.io/guanqz/lumin:arm64 -o /tmp/lumin-arm64.tar
+          ls -lh /tmp/lumin-arm64.tar
+
+      - name: Upload artifact (arm64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumin-image-arm64
+          path: /tmp/lumin-arm64.tar
           retention-days: 7
 
       - name: Print image info
