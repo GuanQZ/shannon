@@ -26,45 +26,45 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Docker image
+      - name: Build and push multi-platform image
         uses: docker/build-push-action@v5
         with:
           context: .
-          load: true
-          tags: ghcr.io/guanqz/lumin:1.0.0,ghcr.io/guanqz/lumin:latest
-          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/guanqz/lumin:1.0.0
+            ghcr.io/guanqz/lumin:latest
+            ghcr.io/guanqz/lumin:1.0.0-amd64
+            ghcr.io/guanqz/lumin:1.0.0-arm64
+            ghcr.io/guanqz/lumin:amd64
+            ghcr.io/guanqz/lumin:arm64
+          platforms: linux/amd64,linux/arm64
           file: ./Dockerfile
 
-      - name: Verify start.sh content
+      - name: Verify start.sh content (amd64)
         run: |
-          # Check that start.sh has proper newlines (not literal \n)
-          START_CONTENT=$(docker run --rm ghcr.io/guanqz/lumin:1.0.0 cat /app/start.sh | head -3)
-          echo "First 3 lines of start.sh:"
+          # Pull and verify the amd64 version
+          docker pull ghcr.io/guanqz/lumin:amd64
+          START_CONTENT=$(docker run --rm ghcr.io/guanqz/lumin:amd64 cat /app/start.sh | head -3)
+          echo "First 3 lines of start.sh (amd64):"
           echo "$START_CONTENT"
-          echo ""
-          # Verify no literal \n in the shebang line
           if echo "$START_CONTENT" | grep -q '\\\\n'; then
             echo "ERROR: start.sh contains literal \\n instead of newlines!"
             exit 1
           fi
           echo "✓ start.sh looks correct"
 
-      - name: Export image to tar
+      - name: Export image to tar (amd64)
         run: |
-          docker save ghcr.io/guanqz/lumin:1.0.0 -o /tmp/lumin.tar
-          ls -lh /tmp/lumin.tar
+          docker save ghcr.io/guanqz/lumin:amd64 -o /tmp/lumin-amd64.tar
+          ls -lh /tmp/lumin-amd64.tar
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: lumin-image
-          path: /tmp/lumin.tar
+          name: lumin-image-amd64
+          path: /tmp/lumin-amd64.tar
           retention-days: 7
-
-      - name: Push to GitHub Container Registry
-        run: |
-          docker push ghcr.io/guanqz/lumin:1.0.0
-          docker push ghcr.io/guanqz/lumin:latest
 
       - name: Print image info
         run: |
