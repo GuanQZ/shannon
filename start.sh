@@ -33,8 +33,7 @@ echo "Starting Temporal Server on port 7233..."
 temporal server start-dev \
   --db-filename /app/temporal-data/temporal.db \
   --ip 0.0.0.0 \
-  --port 7233 \
-  --frontend-port 7233 &
+  --port 7233 &
 TEMPORAL_PID=$!
 
 # Wait for Temporal to be ready
