@@ -106,40 +106,9 @@ is_temporal_ready() {
 
 # Ensure containers are running with correct mounts
 ensure_containers() {
-  # If custom OUTPUT_DIR is set, always refresh worker to ensure correct volume mount
-  # Docker compose will only recreate if the mount actually changed
-  if [ -n "$OUTPUT_DIR" ]; then
-    echo "Ensuring worker has correct output mount..."
-    docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE up -d worker 2>/dev/null || true
-  fi
-
-  # Quick check: if Temporal is already healthy, we're good
-  if is_temporal_ready; then
-    return 0
-  fi
-
-  # Need to start containers
-  echo "Starting Lumin containers..."
-  if [ "$REBUILD" = "true" ]; then
-    # Force rebuild without cache (use when code changes aren't being picked up)
-    echo "Rebuilding with --no-cache..."
-    docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE build --no-cache worker
-  fi
-  docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE up -d --build
-
-  # Wait for Temporal to be ready
-  echo "Waiting for Temporal to be ready..."
-  for i in $(seq 1 30); do
-    if is_temporal_ready; then
-      echo "Temporal is ready!"
-      return 0
-    fi
-    if [ "$i" -eq 30 ]; then
-      echo "Timeout waiting for Temporal"
-      exit 1
-    fi
-    sleep 2
-  done
+  # K8s: Temporal is already running in the Pod, skip docker compose
+  echo "Skipping docker compose (K8s mode - Temporal already running)"
+  return 0
 }
 
 cmd_start() {
@@ -353,13 +322,13 @@ cmd_start() {
 
   # Ensure audit-logs directory exists with write permissions for container user (UID 1001)
   mkdir -p ./audit-logs
-  chmod 777 ./audit-logs
+  chmod 777 ./audit-logs 2>/dev/null || true
 
   # Ensure repo deliverables directory is writable by container user (UID 1001)
   # Use LOCAL_REPO_PATH which is derived from CONTAINER_REPO (works for both local repos and git URLs)
   if [ -n "$LOCAL_REPO_PATH" ]; then
     mkdir -p "$LOCAL_REPO_PATH/deliverables"
-    chmod 777 "$LOCAL_REPO_PATH/deliverables"
+    chmod 777 "$LOCAL_REPO_PATH/deliverables" 2>/dev/null || true
   fi
 
   # Ensure containers are running (starts them if needed)
@@ -392,8 +361,8 @@ cmd_start() {
   fi
 
   # Run the client to submit workflow
-  docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE exec -T worker \
-    node dist/temporal/client.js "$URL" "$CONTAINER_REPO" $ARGS
+  # K8s: directly call node instead of docker compose
+  node /app/dist/temporal/client.js "$URL" "$CONTAINER_REPO" $ARGS
 }
 
 cmd_logs() {

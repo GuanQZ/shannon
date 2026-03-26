@@ -66,8 +66,11 @@ RUN gem install addressable
 COPY --from=builder /usr/lib/python3.*/site-packages /usr/lib/python3.12/site-packages
 COPY --from=builder /usr/bin/schemathesis /usr/bin/
 
-# Download Temporal CLI binary from GitHub releases
-RUN curl -sL -o /tmp/temporal.tar.gz https://github.com/temporalio/cli/releases/download/v1.6.1/temporal_cli_1.6.1_linux_amd64.tar.gz && \
+# Download Temporal CLI binary from GitHub releases (supports both amd64 and arm64)
+ARG TARGETARCH
+RUN ARCH=${TARGETARCH:-amd64} && \
+    if [ "$ARCH" = "arm64" ]; then ARCH_NAME="arm64"; else ARCH_NAME="amd64"; fi && \
+    curl -sL -o /tmp/temporal.tar.gz https://github.com/temporalio/cli/releases/download/v1.6.1/temporal_cli_1.6.1_linux_${ARCH_NAME}.tar.gz && \
     tar -xzf /tmp/temporal.tar.gz -C /usr/local/bin/ temporal && \
     chmod +x /usr/local/bin/temporal && \
     rm /tmp/temporal.tar.gz

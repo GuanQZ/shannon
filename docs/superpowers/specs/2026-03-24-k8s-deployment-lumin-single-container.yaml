@@ -32,7 +32,8 @@ data:
     # Internal Agent 配置
     internalAgent:
       # Internal Agent 服务地址
-      baseUrl: "http://mock-server:3000"
+      # 注意：K8s pod 内无法使用 host.docker.internal，需使用 Docker 网桥 IP (172.17.0.1)
+      baseUrl: "http://172.17.0.1:3000"
 
       # 会话初始化参数
       initSession:
@@ -81,7 +82,7 @@ data:
 
     authentication:
       login_type: form
-      login_url: "http://host.docker.internal/login"
+      login_url: "http://172.17.0.1:3002"
       credentials:
         username: "admin"
         password: "password123"
@@ -109,13 +110,20 @@ spec:
     - name: mcp
       port: 8082
       targetPort: 8082
+      nodePort: 30082
     - name: playwright
       port: 8083
       targetPort: 8083
+      nodePort: 30083
     - name: dashboard
       port: 3457
       targetPort: 3457
-  type: ClusterIP
+      nodePort: 30457
+    - name: temporal-ui
+      port: 8233
+      targetPort: 8233
+      nodePort: 30233
+  type: NodePort
 
 ---
 apiVersion: apps/v1
@@ -143,8 +151,8 @@ spec:
       # 容器配置
       containers:
         - name: lumin
-          image: ghcr.io/guanqz/lumin:1.0.0
-          imagePullPolicy: Always
+          image: ghcr.io/guanqz/lumin:arm64
+          imagePullPolicy: IfNotPresent
 
           # K8s 权限配置
           securityContext:
@@ -152,15 +160,13 @@ spec:
             capabilities:
               add:
                 - NET_RAW
-            seLinuxOptions: ""
             seccompProfile:
               type: Unconfined
 
-          # 共享内存（Playwright 需要）
+          # 共享内存（Playwright 需要）- 通过 hostIPC 共享宿主机内存
           resources:
             limits:
               memory: 4Gi
-              shmSize: 2Gi
             requests:
               memory: 2Gi
 
@@ -184,6 +190,8 @@ spec:
               name: playwright
             - containerPort: 3457
               name: dashboard
+            - containerPort: 8233
+              name: temporal-ui
 
           # 健康检查
           livenessProbe:
@@ -203,6 +211,15 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 3
+
+          # Temporal UI 健康检查
+          startupProbe:
+            httpGet:
+              path: /
+              port: 8233
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30
 
           # 配置挂载
           volumeMounts:

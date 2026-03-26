@@ -3,7 +3,7 @@
 
 authentication:
   login_type: form
-  login_url: "http://host.docker.internal/login"
+  login_url: "http://host.docker.internal:3002"
   credentials:
     username: "admin"
     password: "password123"

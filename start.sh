@@ -67,7 +67,7 @@ DASHBOARD_PID=$!
 echo "=========================================="
 echo "All Lumin services started successfully!"
 echo "Temporal Server:  http://localhost:7233"
-echo "Temporal Web:    http://localhost:8233"
+echo "Temporal Web:    http://localhost:7233"
 echo "MCP Server:      http://localhost:${MCP_PORT}/health"
 echo "Playwright MCP:  http://localhost:${PLAYWRIGHT_PORT}"
 echo "Dashboard:       http://localhost:${DASHBOARD_PORT}"

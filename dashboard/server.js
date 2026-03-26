@@ -56,16 +56,16 @@ if (!sessionId) {
       sessionId = sessions[0]; // 使用最新的
       console.log(`Using latest session: ${sessionId}`);
     } else {
-      console.error('No sessions found in audit-logs/');
-      process.exit(1);
+      console.log('No sessions found in audit-logs/ - Dashboard will start with empty state');
+      sessionId = null;
     }
   } else {
-    console.error('No audit-logs directory found');
-    process.exit(1);
+    console.log('No audit-logs directory found - Dashboard will start with empty state');
+    sessionId = null;
   }
 }
 
-console.log(`Watching session: ${sessionId}`);
+console.log(`Watching session: ${sessionId || 'none (empty state)'}`);
 
 // HTTP服务器
 const server = http.createServer((req, res) => {
