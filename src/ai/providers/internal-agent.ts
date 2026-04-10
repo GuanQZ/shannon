@@ -361,7 +361,7 @@ export class InternalAgentClient {
    * 初始化会话，获取 session_id
    */
   async initSession(): Promise<string> {
-    const url = `${this.config.baseUrl}/agent-api/${this.config.initSession.agentId}/chatabc/init_session`;
+    const url = `${this.config.baseUrl}/chatabc/init_session`;
 
     const body = {
       appId: this.config.initSession.appId,
@@ -419,7 +419,7 @@ export class InternalAgentClient {
       throw new Error('Session not initialized. Call initSession() first.');
     }
 
-    const url = `${this.config.baseUrl}/agent-api/${this.config.initSession.agentId}/chatabc/chat`;
+    const url = `${this.config.baseUrl}/chatabc/chat`;
     this.requestId = generateUUID();
 
     const body = {

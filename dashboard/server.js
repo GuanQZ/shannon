@@ -561,6 +561,7 @@ setInterval(() => {
 
 // 初始化文件位置 - 使用行数而不是字节大小
 function initFilePositions() {
+  if (!sessionId) return;
   const chineseAgentsDir = path.join(AUDIT_LOGS_DIR, sessionId, CHINESE_AGENTS_DIR);
   if (fs.existsSync(chineseAgentsDir)) {
     const files = fs.readdirSync(chineseAgentsDir).filter(f => f.endsWith('.zh.log'));

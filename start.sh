@@ -24,6 +24,7 @@ export DASHBOARD_PORT=${DASHBOARD_PORT:-3457}
 
 # Create required directories
 mkdir -p /app/audit-logs
+mkdir -p /app/audit-logs/default-session
 mkdir -p /app/repos
 mkdir -p /app/deliverables
 mkdir -p /app/temporal-data

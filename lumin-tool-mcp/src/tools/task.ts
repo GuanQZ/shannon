@@ -63,7 +63,7 @@ ${input.prompt}
   const requestId = `task-${timestamp}`;
 
   // Step 1: Initialize session
-  const initUrl = `${baseUrl}/agent-api/${agentId}/chatabc/init_session`;
+  const initUrl = `${baseUrl}/chatabc/init_session`;
   const initBody = {
     appId: INTERNAL_AGENT_INIT_SESSION_APP_ID,
     trCode: INTERNAL_AGENT_INIT_SESSION_TR_CODE,
@@ -99,7 +99,7 @@ ${input.prompt}
   console.log(`[Task] Session initialized: ${sessionId}`);
 
   // Step 2: Send chat request
-  const chatUrl = `${baseUrl}/agent-api/${agentId}/chatabc/chat`;
+  const chatUrl = `${baseUrl}/chatabc/chat`;
   const chatBody = {
     appId: INTERNAL_AGENT_CHAT_APP_ID,
     trCode: INTERNAL_AGENT_CHAT_TR_CODE,
